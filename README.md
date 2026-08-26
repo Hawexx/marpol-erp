@@ -24,7 +24,7 @@ openssl rand -base64 48                    # üretilen değeri JWT_SECRET'a yaz
 
 npm install          # tüm workspace bağımlılıkları
 npm run db:up        # PostgreSQL konteynerini başlat (port 5433, yalnızca localhost)
-npm run prisma:push  # şemayı veritabanına uygula
+npm run prisma:migrate # şemayı veritabanına uygula (migration)
 npm run seed         # başlangıç verisi + demo kullanıcılar
 npm run dev          # API (4000) + arayüz (5173) birlikte
 ```
@@ -93,6 +93,18 @@ web/
   src/components/        Ortak arayüz parçaları
   src/api/               API istemcisi ve tipler
 ```
+
+## Geliştirme komutları
+
+```bash
+npm test               # birim testleri (Vitest)
+npm run lint           # ESLint
+npm run prisma:migrate # yeni migration üret ve uygula (geliştirme)
+npm run prisma:deploy  # mevcut migration'ları uygula (üretim)
+```
+
+Şema `prisma migrate` ile yönetilir; `prisma db push` yalnızca hızlı deneme
+içindir ve migration geçmişi bırakmaz.
 
 ## Komutlar
 

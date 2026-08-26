@@ -4,11 +4,10 @@ import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { text } from '../lib/schemaHelpers.js';
 import { requireAnyPermission, requireAuth, requirePermission } from '../middleware/auth.js';
 
 export const chemicalsRouter = Router();
-
-const text = z.string().trim().optional().nullable();
 
 const schema = z.object({
   code: z.string().trim().min(1, 'Kimyasal kodu zorunludur.'),

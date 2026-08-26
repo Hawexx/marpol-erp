@@ -3,8 +3,7 @@ import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
 import { crudRouter } from '../lib/crudRouter.js';
 import { conflict } from '../lib/http.js';
-
-const text = z.string().trim().optional().nullable();
+import { text } from '../lib/schemaHelpers.js';
 
 const schema = z.object({
   code: z.string().trim().min(1, 'Makine kodu zorunludur.'),

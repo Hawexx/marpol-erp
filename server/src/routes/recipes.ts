@@ -2,14 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
-import { asyncHandler, badRequest, conflict } from '../lib/http.js';
+import { asyncHandler, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { assertNoDuplicates, assertRatioTotal, text } from '../lib/schemaHelpers.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
 export const recipesRouter = Router();
 
 const MODULE = ModuleKey.KIMYASAL_RECETE;
-const text = z.string().trim().optional().nullable();
 
 const itemSchema = z.object({
   chemicalId: z.string().uuid('Kimyasal secimi gecersiz.'),
@@ -39,14 +39,6 @@ const include = {
 };
 
 /** Recete oranlari toplami %100 olmalidir (0.01 tolerans ile). */
-function assertRatioTotal(items: { ratio: number }[]): void {
-  const total = items.reduce((sum, item) => sum + item.ratio, 0);
-  if (Math.abs(total - 100) > 0.01) {
-    throw badRequest(
-      `Kimyasal oranlarinin toplami %100 olmalidir. Su anki toplam: %${total.toFixed(2)}`,
-    );
-  }
-}
 
 recipesRouter.use(requireAuth);
 
@@ -90,6 +82,7 @@ recipesRouter.post(
   asyncHandler(async (req, res) => {
     const { items, ...recipe } = schema.parse(req.body);
     assertRatioTotal(items);
+    assertNoDuplicates(items, (i) => i.chemicalId, 'Kimyasal');
 
     const created = await prisma.recipe.create({
       data: { ...recipe, items: { create: items } },
@@ -106,6 +99,7 @@ recipesRouter.put(
   asyncHandler(async (req, res) => {
     const { items, ...recipe } = updateSchema.parse(req.body);
     assertRatioTotal(items);
+    assertNoDuplicates(items, (i) => i.chemicalId, 'Kimyasal');
     const id = req.params.id;
 
     const updated = await prisma.$transaction(async (tx) => {

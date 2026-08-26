@@ -2,9 +2,7 @@ import { z } from 'zod';
 import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
 import { crudRouter } from '../lib/crudRouter.js';
-
-const num = z.coerce.number().nonnegative().optional().nullable();
-const text = z.string().trim().optional().nullable();
+import { text, num } from '../lib/schemaHelpers.js';
 
 const schema = z.object({
   code: z.string().trim().min(1, 'Flans kodu zorunludur.'),

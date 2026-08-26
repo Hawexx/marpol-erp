@@ -7,13 +7,18 @@ import { prisma } from '../db.js';
 import { asyncHandler, badRequest, conflict, forbidden } from '../lib/http.js';
 import { pageResponse, readPageParams } from '../lib/pagination.js';
 import { audit } from '../lib/audit.js';
+import { assertNoDuplicates, assertRatioTotal, text } from '../lib/schemaHelpers.js';
+import {
+  ONAY_GEREKTIREN_DURUMLAR,
+  STEP_TRANSITIONS,
+  TRANSITIONS,
+} from '../lib/orderState.js';
 import { requireAnyPermission, requireAuth, requirePermission } from '../middleware/auth.js';
 
 export const ordersRouter = Router();
 
 const CREATE_MODULE = ModuleKey.URETIM_EMRI_OLUSTUR;
 const LIST_MODULE = ModuleKey.URETIM_EMIRLERI;
-const text = z.string().trim().optional().nullable();
 
 const chemicalSchema = z.object({
   chemicalId: z.string().uuid('Kimyasal secimi gecersiz.'),
@@ -170,12 +175,8 @@ async function resolveChemicals(
     throw badRequest('Kimyasal oranlamasi girilmeli veya bir recete secilmelidir.');
   }
 
-  const total = rows.reduce((sum, r) => sum + r.ratio, 0);
-  if (Math.abs(total - 100) > 0.01) {
-    throw badRequest(
-      `Kimyasal oranlarinin toplami %100 olmalidir. Su anki toplam: %${total.toFixed(2)}`,
-    );
-  }
+  assertRatioTotal(rows);
+  assertNoDuplicates(rows, (r) => r.chemicalId, 'Kimyasal');
 
   return rows.map((r, i) => ({
     chemicalId: r.chemicalId,
@@ -477,24 +478,6 @@ ordersRouter.put(
   }),
 );
 
-/** Izin verilen durum gecisleri. */
-const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.TASLAK]: [OrderStatus.ONAY_BEKLIYOR, OrderStatus.IPTAL],
-  [OrderStatus.ONAY_BEKLIYOR]: [OrderStatus.PLANLANDI, OrderStatus.IPTAL],
-  [OrderStatus.PLANLANDI]: [OrderStatus.URETIMDE, OrderStatus.BEKLEMEDE, OrderStatus.IPTAL],
-  [OrderStatus.URETIMDE]: [OrderStatus.BEKLEMEDE, OrderStatus.TAMAMLANDI, OrderStatus.IPTAL],
-  [OrderStatus.BEKLEMEDE]: [OrderStatus.URETIMDE, OrderStatus.IPTAL],
-  [OrderStatus.TAMAMLANDI]: [],
-  [OrderStatus.IPTAL]: [],
-};
-
-/** Yalnizca canApprove yetkisi olanlarin yapabilecegi durum gecisleri. */
-const ONAY_GEREKTIREN_DURUMLAR = new Set<OrderStatus>([
-  OrderStatus.PLANLANDI,
-  OrderStatus.TAMAMLANDI,
-  OrderStatus.IPTAL,
-]);
-
 const statusSchema = z.object({
   status: z.nativeEnum(OrderStatus),
   producedQty: z.coerce.number().int().nonnegative().optional(),
@@ -667,23 +650,6 @@ const stepSchema = z.object({
   scrapQty: z.coerce.number().int().nonnegative().optional().nullable(),
   notes: text,
 });
-
-/**
- * Adim durumlari icin izin verilen gecisler.
- *
- * Kural ileri yonlu hareketi kisitlamaz: "Baslat"a basmadan isi bitiren bir
- * operatorun adimi dogrudan tamamlayabilmesi gerekir. Amac, anlamsiz GERIYE
- * donuslari engellemek (ornegin tamamlanmis bir adimi "bekliyor"a cevirip
- * uretim gecmisini gorunmez kilmak).
- */
-const STEP_TRANSITIONS: Record<StepStatus, StepStatus[]> = {
-  [StepStatus.BEKLIYOR]: [StepStatus.BASLADI, StepStatus.TAMAMLANDI, StepStatus.ATLANDI],
-  [StepStatus.BASLADI]: [StepStatus.TAMAMLANDI, StepStatus.BEKLIYOR, StepStatus.ATLANDI],
-  // Tamamlanan adim duzeltme icin yeniden acilabilir, ancak dogrudan
-  // "bekliyor"a dondurulemez.
-  [StepStatus.TAMAMLANDI]: [StepStatus.BASLADI, StepStatus.ATLANDI],
-  [StepStatus.ATLANDI]: [StepStatus.BEKLIYOR, StepStatus.BASLADI, StepStatus.TAMAMLANDI],
-};
 
 /** Sahadaki operatorun proses adimini ilerletmesi. */
 ordersRouter.patch(

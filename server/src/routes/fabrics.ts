@@ -4,13 +4,12 @@ import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { assertNoDuplicates, assertRatioTotal, num, text } from '../lib/schemaHelpers.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
 export const fabricsRouter = Router();
 
 const MODULE = ModuleKey.KUMAS;
-const text = z.string().trim().optional().nullable();
-const num = z.coerce.number().nonnegative().optional().nullable();
 
 /** Kumasa emdirilecek kimyasal + varsayilan oran satiri. */
 const chemicalLinkSchema = z.object({
@@ -91,6 +90,13 @@ fabricsRouter.post(
   requirePermission(MODULE, 'create'),
   asyncHandler(async (req, res) => {
     const { chemicals, ...fabric } = schema.parse(req.body);
+    /*
+     * Ayni %100 kurali recete ve emirde bastan beri zorunluydu; kumasta ise
+     * hic kontrol edilmiyordu. Bos birakmak serbest, ama satir girildiyse
+     * toplam tutmali.
+     */
+    assertRatioTotal(chemicals, 'Kumas kimyasal oranlarinin');
+    assertNoDuplicates(chemicals, (c) => c.chemicalId, 'Kimyasal');
     const created = await prisma.fabric.create({
       data: { ...fabric, chemicals: { create: chemicals } },
       include,
@@ -105,6 +111,13 @@ fabricsRouter.put(
   requirePermission(MODULE, 'edit'),
   asyncHandler(async (req, res) => {
     const { chemicals, ...fabric } = updateSchema.parse(req.body);
+    /*
+     * Ayni %100 kurali recete ve emirde bastan beri zorunluydu; kumasta ise
+     * hic kontrol edilmiyordu. Bos birakmak serbest, ama satir girildiyse
+     * toplam tutmali.
+     */
+    assertRatioTotal(chemicals, 'Kumas kimyasal oranlarinin');
+    assertNoDuplicates(chemicals, (c) => c.chemicalId, 'Kimyasal');
     const id = req.params.id;
 
     // Kimyasal listesi tamamen yeniden yazilir (silinen satirlar da temizlenir).

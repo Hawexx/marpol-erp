@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { env } from './env.js';
+import { prisma } from './db.js';
 import { errorHandler, notFound } from './lib/http.js';
 import { authRouter } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
@@ -96,6 +97,55 @@ app.use('/api/stock', stockRouter);
 app.use((_req, _res, next) => next(notFound('Istenen servis bulunamadi.')));
 app.use(errorHandler);
 
-app.listen(env.port, () => {
+const server = app.listen(env.port, () => {
   console.log(`[MARPOL PPM] API calisiyor -> http://localhost:${env.port}`);
+});
+
+server.on('error', (err) => {
+  console.error('[MARPOL PPM] Sunucu baslatilamadi:', err);
+  process.exit(1);
+});
+
+/**
+ * Duzenli kapanis.
+ *
+ * Onceden hicbir sinyal dinlenmiyordu: konteyner yeniden baslatildiginda
+ * islenmekte olan istekler yarida kesiliyor ve veritabani baglantilari
+ * kapatilmadan birakiliyordu.
+ */
+let kapaniyor = false;
+
+async function shutdown(signal: string) {
+  if (kapaniyor) return;
+  kapaniyor = true;
+  console.log(`[MARPOL PPM] ${signal} alindi, kapaniyor...`);
+
+  // Yeni baglanti kabul etme, acik istekleri bitmeye birak.
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+    } catch (err) {
+      console.error('[MARPOL PPM] Veritabani baglantisi kapatilamadi:', err);
+    }
+    console.log('[MARPOL PPM] Kapandi.');
+    process.exit(0);
+  });
+
+  // Takilan baglantilar kapanisi sonsuza kadar bekletmesin.
+  setTimeout(() => {
+    console.error('[MARPOL PPM] Zaman asimi, zorla kapatiliyor.');
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+
+// Yakalanmamis hatalar sessizce yutulmasin.
+process.on('unhandledRejection', (reason) => {
+  console.error('[MARPOL PPM] Islenmemis promise reddi:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[MARPOL PPM] Yakalanmamis istisna:', err);
+  void shutdown('uncaughtException');
 });

@@ -4,12 +4,12 @@ import { ModuleKey, NodeType, StepStatus } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler, badRequest, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { text } from '../lib/schemaHelpers.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
 export const workflowsRouter = Router();
 
 const MODULE = ModuleKey.IS_AKISI;
-const text = z.string().trim().optional().nullable();
 
 /**
  * Dugum id'leri istemcide (crypto.randomUUID) uretilir; boylece semadaki

@@ -3,6 +3,7 @@ import { ModuleKey, OrderStatus, StepStatus } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/http.js';
 import { requireAnyPermission, requireAuth } from '../middleware/auth.js';
+import { ACIK_DURUMLAR } from '../lib/orderState.js';
 
 export const planningRouter = Router();
 
@@ -14,15 +15,6 @@ const canRead = requireAnyPermission(
   [ModuleKey.URETIM_EMIRLERI, ModuleKey.URETIM_EMRI_OLUSTUR],
   'view',
 );
-
-/** Uretimi devam eden (kapanmamis) emir durumlari. */
-const ACIK_DURUMLAR: OrderStatus[] = [
-  OrderStatus.TASLAK,
-  OrderStatus.ONAY_BEKLIYOR,
-  OrderStatus.PLANLANDI,
-  OrderStatus.URETIMDE,
-  OrderStatus.BEKLEMEDE,
-];
 
 const GUN_MS = 86_400_000;
 
