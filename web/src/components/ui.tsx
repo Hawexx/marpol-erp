@@ -155,16 +155,28 @@ export function FieldGroup({ children }: { children: ReactNode }) {
 export function KpiTile({
   label,
   value,
+  /** Degerin yanina kucuk punto ile yazilan birim ("adet", "%"). */
+  unit,
+  /** Etiket satirini uzatmadan aciklama eklemek icin. */
+  hint,
   tone = 'info',
 }: {
   label: string;
   value: ReactNode;
+  unit?: string;
+  hint?: string;
   tone?: 'info' | 'good' | 'warning' | 'critical';
 }) {
   return (
     <div className={`mp-kpi mp-kpi--${tone}`}>
-      <div className="mp-kpi__label">{label}</div>
-      <div className="mp-kpi__value">{value}</div>
+      <div className="mp-kpi__label" title={hint}>
+        {label}
+      </div>
+      <div className="mp-kpi__value">
+        {value}
+        {unit && <span className="mp-kpi__unit">{unit}</span>}
+      </div>
+      {hint && <div className="mp-kpi__hint">{hint}</div>}
     </div>
   );
 }

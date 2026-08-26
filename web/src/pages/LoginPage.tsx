@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, Input, Label, MessageStrip } from '@ui5/webcomponents-react';
+import { Button, Input, InputIcon, Label, MessageStrip } from '@ui5/webcomponents-react';
+import { useAppTheme } from '../theme/ThemeContext.js';
 import { useAuth } from '../auth/AuthContext.js';
 import { errorMessage } from '../api/client.js';
 
@@ -16,8 +17,23 @@ const INTRO_SEEN_KEY = 'marpol.ppm.introSeen';
  * verisi engelliyse okuma hata firlatabilir, bu yuzden sarmalanir.
  */
 function introSeen(): boolean {
+  // Hareket azaltma tercihi olan kullaniciya ve olculu veri modundaki
+  // baglantiya 2,4 MB'lik video hic indirilmez.
+  if (skipIntro()) return true;
   try {
     return localStorage.getItem(INTRO_SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Video hic oynatilmamali mi? */
+function skipIntro(): boolean {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+    // Standart disi ama yaygin: kullanici "veri tasarrufu" acmissa.
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    return conn?.saveData === true;
   } catch {
     return false;
   }
@@ -33,8 +49,10 @@ function markIntroSeen(): void {
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { theme, toggleTheme } = useAppTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [introDone, setIntroDone] = useState(introSeen);
@@ -63,59 +81,94 @@ export default function LoginPage() {
         />
       )}
 
-      <form className="mp-login__panel" onSubmit={submit}>
-        <img className="mp-login__logo" src="/marpol.svg" alt="Marpol" />
-        <h1 className="mp-login__title">Üretim Yönetim Sistemi</h1>
-        <p className="mp-login__sub">Devam etmek için kurumsal hesabınızla giriş yapın.</p>
+      <div className="mp-login__card">
+        {/* Marka tuvali; dar ekranda gizlenir. */}
+        <aside className="mp-login__brand">
+          <img className="mp-login__logo" src="/marpol.svg" alt="Marpol" />
+          <p className="mp-login__brand-text">
+            Kumaş hazırlıktan flanş montajına, üretim emirlerinin her adımını tek
+            yerden izleyin.
+          </p>
+          <span className="mp-overline" style={{ color: 'inherit', opacity: 0.7 }}>
+            Üretim Yönetim Sistemi
+          </span>
+        </aside>
 
-        {error && (
-          <div style={{ marginBottom: '1rem' }}>
+        <form className="mp-login__panel" onSubmit={submit}>
+          {/* Kullanici giris yapmadan da temayi secebilmeli: koyu tema
+              kullanicisi eskiden beyaz bir kartla karsilaniyordu. */}
+          <Button
+            className="mp-login__theme"
+            design="Transparent"
+            icon={theme === 'dark' ? 'light-mode' : 'dark-mode'}
+            tooltip={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+            onClick={toggleTheme}
+          />
+
+          <h1 className="mp-login__title">Giriş yapın</h1>
+          <p className="mp-login__sub">
+            Devam etmek için kurumsal hesabınızla giriş yapın.
+          </p>
+
+          {error && (
             <MessageStrip design="Negative" hideCloseButton>
               {error}
             </MessageStrip>
+          )}
+
+          <div className="mp-login__field">
+            <Label for="username" required showColon>
+              Kullanıcı Adı
+            </Label>
+            <Input
+              id="username"
+              name="username"
+              autoFocus
+              accessibleName="Kullanıcı adı"
+              style={{ width: '100%' }}
+              value={username}
+              onInput={(e) => setUsername(e.target.value)}
+            />
           </div>
-        )}
 
-        <div style={{ marginBottom: '0.875rem' }}>
-          <Label for="username" required showColon>
-            Kullanıcı Adı
-          </Label>
-          <Input
-            id="username"
+          <div className="mp-login__field">
+            <Label for="password" required showColon>
+              Şifre
+            </Label>
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? 'Text' : 'Password'}
+              accessibleName="Şifre"
+              style={{ width: '100%' }}
+              value={password}
+              onInput={(e) => setPassword(e.target.value)}
+            >
+              <InputIcon
+                slot="icon"
+                name={showPassword ? 'hide' : 'show'}
+                accessibleName={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                onClick={() => setShowPassword((v) => !v)}
+              />
+            </Input>
+          </div>
+
+          {/* type="Submit": Enter tusu formu gonderir, ayri bir gizli
+              submit butonuna gerek kalmaz. */}
+          <Button
+            design="Emphasized"
+            type="Submit"
             style={{ width: '100%' }}
-            value={username}
-            onInput={(e) => setUsername(e.target.value)}
-          />
-        </div>
+            disabled={busy || !username || !password}
+          >
+            {busy ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          </Button>
 
-        <div style={{ marginBottom: '1.25rem' }}>
-          <Label for="password" required showColon>
-            Şifre
-          </Label>
-          <Input
-            id="password"
-            type="Password"
-            style={{ width: '100%' }}
-            value={password}
-            onInput={(e) => setPassword(e.target.value)}
-          />
-        </div>
-
-        <Button
-          design="Emphasized"
-          style={{ width: '100%' }}
-          onClick={() => submit()}
-          disabled={busy || !username || !password}
-        >
-          {busy ? 'Giriş yapılıyor...' : 'Giriş Yap'}
-        </Button>
-        {/* Enter tusuyla gonderim icin gizli submit */}
-        <button type="submit" style={{ display: 'none' }} aria-hidden="true" />
-
-        <div className="mp-login__footer">
-          Marpol A.Ş. &middot; Üretim Yönetim Sistemi v1.0
-        </div>
-      </form>
+          <div className="mp-login__footer">
+            Marpol A.Ş. &middot; Üretim Yönetim Sistemi v1.0
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -183,6 +183,62 @@ ui5-multi-input {
   padding: var(--mp-space-2) 0;
 }
 
+/* ==========================================================================
+   Emir detay penceresi
+   ==========================================================================
+
+   Onceden 18 mikro alan tek bir auto-fit izgarasina donulmustu ve ilgisiz
+   alanlar yan yana diziliyordu. Artik once kimlik blogu, sonra dort
+   adlandirilmis grup var; izgara 18 alana degil gruplara uygulaniyor. */
+.mp-detail {
+  display: grid;
+  gap: var(--mp-gap-block);
+  padding: var(--mp-space-2) var(--mp-space-1);
+}
+
+.mp-detail__identity {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mp-gap-section);
+  flex-wrap: wrap;
+}
+
+.mp-detail__no {
+  font-size: var(--mp-font-size-display);
+  font-weight: var(--mp-font-weight-bold);
+  line-height: var(--mp-line-height-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-detail__badges {
+  display: flex;
+  gap: var(--mp-gap-inline);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mp-detail__groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--mp-gap-block) var(--mp-gap-section);
+}
+
+.mp-detail__summary {
+  margin: var(--mp-space-2) 0 0;
+  line-height: var(--mp-line-height-relaxed);
+}
+
+/* One cikan blok. RENKSIZ: yeni bir renk yok, yalnizca mevcut yuzey
+   token'i, sol kenar cizgisi ve golge. */
+.mp-callout {
+  background: var(--sapGroup_ContentBackground, #fff);
+  border-inline-start: 4px solid var(--sapNeutralElementColor, #6a6d70);
+  border-radius: var(--mp-radius-sm);
+  box-shadow: var(--mp-shadow-1);
+  padding: var(--mp-space-3) var(--mp-pad-card);
+}
+
 /* Bos / hata / yukleniyor ekranlari: yuzeyin ortasinda nefes alan bir blok. */
 .mp-state {
   display: flex;
@@ -355,11 +411,27 @@ ui5-multi-input {
 }
 
 .mp-kpi__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mp-space-1);
   font-size: var(--mp-font-size-display);
   font-weight: var(--mp-font-weight-bold);
   line-height: var(--mp-line-height-tight);
   font-variant-numeric: tabular-nums;
   color: var(--sapTextColor);
+}
+
+.mp-kpi__unit {
+  font-size: var(--mp-font-size-sm);
+  font-weight: var(--mp-font-weight-regular);
+  color: var(--sapContent_LabelColor);
+}
+
+/* Uzun aciklamalar etiketi iki satira sarmak yerine buraya iner. */
+.mp-kpi__hint {
+  font-size: var(--mp-font-size-xs);
+  line-height: var(--mp-line-height-snug);
+  color: var(--sapContent_LabelColor);
 }
 
 .mp-kpi--critical {
@@ -387,41 +459,111 @@ ui5-multi-input {
   padding: 2rem;
 }
 
+/*
+ * Bolunmus kart: solda marka tuvali, sagda form.
+ * Dar ekranda tek sutuna iner ve marka tuvali gizlenir.
+ */
+.mp-login__card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(1000px, 100%);
+  border-radius: var(--mp-radius-xl);
+  overflow: hidden;
+  box-shadow: var(--mp-shadow-overlay);
+  /* Panelin girisi: hafifce yukselerek belirir. */
+  animation: mp-login-rise var(--mp-duration-slow) var(--mp-ease-standard) both;
+}
+
+@keyframes mp-login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Marka tuvali. Zemin giris ekraninin kendi gradyaniyla ayni ailede;
+   YENI RENK EKLENMEDI, ayni degerler kullanildi. */
+.mp-login__brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--mp-gap-block);
+  padding: var(--mp-space-10) var(--mp-space-8);
+  background:
+    radial-gradient(600px 400px at 20% 15%, rgba(var(--mp-brand-rgb), 0.08), transparent 60%),
+    linear-gradient(160deg, #0a2540 0%, #123a5e 55%, #0a2540 100%);
+  color: #fff;
+}
+
+.mp-login__brand-text {
+  font-size: var(--mp-font-size-sm);
+  line-height: var(--mp-line-height-relaxed);
+  opacity: 0.85;
+  max-width: 34ch;
+}
+
 .mp-login__panel {
-  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mp-gap-stack);
   background: var(--sapGroup_ContentBackground, #fff);
   color: var(--sapTextColor, #32363a);
-  border-radius: 0.75rem;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-  padding: 2rem 2rem 1.75rem;
+  padding: var(--mp-space-10) var(--mp-space-8);
 }
 
 .mp-login__logo {
   display: block;
   width: 210px;
-  margin: 0 auto 0.5rem;
+  max-width: 100%;
 }
 
 .mp-login__title {
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 600;
+  /* Bu baslik uygulamanin EN KUCUK basligiydi (16px/600). Giris ekraninin
+     tek basligi olarak artik gercek bir baslik olcusunde. */
+  font-size: clamp(1.5rem, 2.6vw, 1.875rem);
+  font-weight: var(--mp-font-weight-bold);
+  line-height: var(--mp-line-height-tight);
   color: var(--sapTextColor, #32363a);
-  margin: 0 0 0.25rem;
+  margin: 0;
 }
 
 .mp-login__sub {
-  text-align: center;
-  font-size: 0.8125rem;
+  font-size: var(--mp-font-size-sm);
+  line-height: var(--mp-line-height-snug);
   color: var(--sapContent_LabelColor, #6a6d70);
-  margin: 0 0 1.5rem;
+  margin: 0;
+}
+
+/* Alan araliklari tekillestirildi: onceden 1rem / 0.875rem / 1.25rem. */
+.mp-login__field {
+  display: grid;
+  gap: var(--mp-space-1);
 }
 
 .mp-login__footer {
-  margin-top: 1.25rem;
-  text-align: center;
-  font-size: 0.75rem;
+  margin-top: auto;
+  padding-top: var(--mp-space-4);
+  font-size: var(--mp-font-size-xs);
   color: var(--sapContent_LabelColor, #8c8c8c);
+}
+
+.mp-login__theme {
+  align-self: flex-start;
+}
+
+@media (max-width: 860px) {
+  .mp-login__card {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dar ekranda marka tuvali yer kaplamasin; logo forma tasinir. */
+  .mp-login__brand {
+    display: none;
+  }
 }
 
 /* Proses semasi tuvali */
@@ -835,6 +977,40 @@ ui5-multi-input {
 
 /* --- Planlama ekrani gorselleri ----------------------------------------- */
 
+/* Yatay cubuk listesi: etiket ve deger ustte, cubuk altta.
+   Etiket eskiden sabit %40'lik bir sutundaydi ve uzun Turkce etiketler
+   kirpiliyordu. */
+.mp-barlist {
+  display: grid;
+  gap: var(--mp-gap-stack);
+}
+
+.mp-barlist__caption {
+  margin-bottom: var(--mp-space-3);
+}
+
+.mp-barlist__row {
+  display: grid;
+  gap: var(--mp-space-1);
+}
+
+.mp-barlist__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mp-gap-inline);
+  font-size: var(--mp-font-size-sm);
+}
+
+.mp-barlist__label {
+  min-width: 0;
+}
+
+.mp-barlist__value {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
 /* Yatay oran cubugu (durum dagilimi, makine yuku, ilerleme) */
 .mp-bar {
   flex: 1;
@@ -853,15 +1029,25 @@ ui5-multi-input {
   transition: width 0.2s ease;
 }
 
-/* Gunluk uretim sutunlari */
+/* ==========================================================================
+   Gunluk uretim sutunlari
+   ==========================================================================
+
+   Cubuk yuksekligi eskiden PIKSEL hesaplaniyordu (en fazla 120px) ama kap
+   160px'ti; en yuksek cubuk bile tavana ulasamiyor, ustte kullanilmayan bir
+   bant kaliyordu. Dar ekranda ise kap 120px'e iniyor, cubuk yine 120px
+   hesaplandigi icin etiketiyle birlikte kaptan TASIYORDU.
+
+   Artik cubuk, etiketten arta kalan alanin YUZDESI kadar yukseliyor:
+   en yuksek cubuk her zaman tam tepeye oturuyor ve hicbir kap yuksekliginde
+   tasma olmuyor. */
 .mp-daily {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 4px;
-  height: 160px;
-  margin-top: 0.75rem;
+  height: 180px;
   overflow-x: auto;
-  padding-bottom: 0.25rem;
+  padding-bottom: var(--mp-space-1);
 }
 
 .mp-daily__bar {
@@ -872,13 +1058,27 @@ ui5-multi-input {
   min-width: 22px;
 }
 
-.mp-daily__stack {
+/*
+ * Cizim alani. Kilavuz cizgileri ek DOM dugumu yerine iki tekrarlayan
+ * gradient ile ciziliyor: yatay cizgiler (%25 araliklarla) ve taban cizgisi.
+ */
+.mp-daily__track {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   width: 18px;
   display: flex;
+  align-items: flex-end;
+}
+
+.mp-daily__stack {
+  width: 100%;
+  display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   background: var(--sapChart_OrderedColor_1, var(--sapBrandColor));
   border-radius: 3px 3px 0 0;
+  min-height: 2px;
 }
 
 /* Fire payi sutunun ustunde negatif renkte gosterilir */
@@ -889,11 +1089,118 @@ ui5-multi-input {
 }
 
 .mp-daily__label {
-  font-size: 0.6875rem;
+  font-size: var(--mp-font-size-xs);
   color: var(--sapContent_LabelColor);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Termin zaman cizelgesi (basit Gantt) */
+/* Ay siniri: "30 31 01 02" karisikligini bitiren dikey ayirici. */
+.mp-daily__bar--month-start {
+  border-inline-start: 1px solid var(--sapList_BorderColor);
+  padding-inline-start: 3px;
+}
+
+/* Grafigin kendi cercevesi: taban cizgisi ve kilavuzlar. */
+.mp-chart {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--mp-gap-inline);
+}
+
+.mp-chart__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: var(--mp-font-size-xs);
+  color: var(--sapContent_LabelColor);
+  font-variant-numeric: tabular-nums;
+  /* Sutun etiketleri satirinin yuksekligi kadar asagidan bitir. */
+  padding-bottom: calc(var(--mp-font-size-xs) + 8px);
+  text-align: end;
+}
+
+.mp-chart__plot {
+  position: relative;
+  min-width: 0;
+  /* Kilavuz cizgileri: %25 araliklarla yatay cizgiler. Ek DOM yok. */
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--sapList_BorderColor) 0,
+    var(--sapList_BorderColor) 1px,
+    transparent 1px,
+    transparent 25%
+  );
+  background-position: bottom;
+  background-size: 100% calc(100% - var(--mp-font-size-xs) - 8px);
+  background-repeat: no-repeat;
+}
+
+/* Fare/klavye ile secilen gunun okunacagi sabit satir. Grafigin altinda
+   duruyor; kirpilan native tooltip yerine her zaman gorunur bir metin. */
+.mp-chart__readout {
+  margin-top: var(--mp-space-2);
+  font-size: var(--mp-font-size-sm);
+  color: var(--sapContent_LabelColor);
+  min-height: 1.5em;
+}
+
+.mp-chart__legend {
+  display: flex;
+  gap: var(--mp-gap-section);
+  flex-wrap: wrap;
+  font-size: var(--mp-font-size-xs);
+  color: var(--sapContent_LabelColor);
+  margin-bottom: var(--mp-space-2);
+}
+
+.mp-chart__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mp-space-1);
+}
+
+.mp-chart__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.mp-chart__swatch--produced {
+  background: var(--sapChart_OrderedColor_1, var(--sapBrandColor));
+}
+
+.mp-chart__swatch--scrap {
+  background: var(--sapNegativeElementColor, #bb0000);
+}
+
+/* ==========================================================================
+   Termin zaman cizelgesi (basit Gantt)
+   ==========================================================================
+
+   Eksen tablo BASLIGINDA duruyor ve en erken baslangictan en gec termine
+   uzaniyor. Onceden eksen "bugun"den basladigi icin bugun cizgisi her zaman
+   %0'da, yani sol kenarda kaliyor ve hicbir bilgi tasimiyordu. */
+.mp-gantt-axis {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: var(--mp-font-size-xs);
+  font-weight: var(--mp-font-weight-regular);
+  color: var(--sapContent_LabelColor);
+  white-space: nowrap;
+}
+
+.mp-gantt-axis__today {
+  position: absolute;
+  transform: translateX(-50%);
+  padding-inline: 2px;
+  background: var(--sapList_HeaderBackground);
+  font-weight: var(--mp-font-weight-medium);
+}
+
 .mp-gantt {
   position: relative;
   height: 12px;
@@ -901,6 +1208,18 @@ ui5-multi-input {
   background: var(--sapList_Background);
   border: 1px solid var(--sapList_BorderColor);
   border-radius: 999px;
+  overflow: hidden;
+}
+
+/* Satirdaki bugun izi; eksendeki "Bugün" etiketiyle ayni x'te. */
+.mp-gantt__today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--sapContent_LabelColor);
+  opacity: 0.5;
+  z-index: 1;
 }
 
 .mp-gantt__bar {
@@ -988,16 +1307,17 @@ ui5-multi-input {
     min-height: 300px;
   }
 
-  /* Gunluk uretim grafigi dar ekranda da okunabilir kalsin */
+  /* Gunluk uretim grafigi dar ekranda da okunabilir kalsin.
+     Cubuklar yuzde hesaplandigi icin kap kisaldiginda artik tasmiyor. */
   .mp-daily {
-    height: 120px;
+    height: 140px;
   }
 
   .mp-daily__bar {
     min-width: 16px;
   }
 
-  .mp-daily__stack {
+  .mp-daily__track {
     width: 12px;
   }
 }

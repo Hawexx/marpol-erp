@@ -192,13 +192,16 @@ function Dashboard({
         />
         <KpiTile label="Termini Geçen" value={formatNumber(data.overdue)} tone="critical" />
         <KpiTile
-          label="Üretilen (tamamlanan emirler)"
+          label="Üretilen"
           value={formatNumber(data.production.produced)}
+          unit="adet"
+          hint="Tamamlanan emirler"
           tone="good"
         />
         <KpiTile
           label="Fire Oranı"
-          value={`%${data.production.scrapRate.toFixed(1)}`}
+          value={data.production.scrapRate.toFixed(1)}
+          unit="%"
           tone={data.production.scrapRate > 5 ? 'critical' : 'good'}
         />
       </div>
@@ -206,6 +209,7 @@ function Dashboard({
       <div className="mp-split">
         <Section title="Durum Dağılımı" className="mp-split__col">
           <BarList
+            caption="Tüm emirler"
             items={(Object.keys(STATUS_LABEL) as OrderStatus[]).map((s) => ({
               label: STATUS_LABEL[s],
               value: data.byStatus[s] ?? 0,
@@ -215,6 +219,7 @@ function Dashboard({
 
         <Section title="Açık Emirlerde Aciliyet" className="mp-split__col">
           <BarList
+            caption="Yalnızca açık emirler"
             items={(Object.keys(PRIORITY_LABEL) as Priority[]).map((p) => ({
               label: PRIORITY_LABEL[p],
               value: data.byPriority[p] ?? 0,
@@ -223,51 +228,143 @@ function Dashboard({
         </Section>
       </div>
 
-      <Section title="Son 30 Gün Üretimi">
+      <Section title="Son 30 Gün Üretimi" subtitle="Tamamlanan emirlerin günlük sağlam ve fire adetleri">
         {data.daily.length === 0 ? (
           <Text>Bu dönemde tamamlanmış emir yok.</Text>
         ) : (
-          <div className="mp-daily">
-            {data.daily.map((gun) => {
-              const toplam = gun.produced + gun.scrap;
-              const yukseklik = Math.max(4, (toplam / enYuksekGunluk) * 120);
-              const firePay = toplam > 0 ? (gun.scrap / toplam) * 100 : 0;
-              return (
-                <div
-                  key={gun.date}
-                  className="mp-daily__bar"
-                  title={`${formatDate(gun.date)} — ${formatNumber(gun.produced)} sağlam, ${formatNumber(
-                    gun.scrap,
-                  )} fire (${gun.orders} emir)`}
-                >
-                  <div className="mp-daily__stack" style={{ height: `${yukseklik}px` }}>
-                    <div className="mp-daily__scrap" style={{ height: `${firePay}%` }} />
-                  </div>
-                  <span className="mp-daily__label">{gun.date.slice(8)}</span>
-                </div>
-              );
-            })}
-          </div>
+          <DailyChart days={data.daily} max={enYuksekGunluk} />
         )}
       </Section>
     </>
   );
 }
 
-/** Basit yatay cubuk listesi; harici grafik kutuphanesi gerektirmez. */
-function BarList({ items }: { items: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...items.map((i) => i.value));
+/**
+ * Gunluk uretim sutun grafigi.
+ *
+ * Cubuk yuksekligi PIKSEL degil YUZDE: en yuksek cubuk cizim alaninin
+ * tamamini kaplar. Onceki surumde yukseklik en fazla 120px hesaplaniyordu
+ * ama kap 160px'ti (ustte olu bant), dar ekranda ise kap 120px'e indigi
+ * halde cubuk yine 120px hesaplandigi icin tasiyordu.
+ */
+interface BarItem {
+  label: string;
+  value: number;
+}
+
+function DailyChart({
+  days,
+  max,
+}: {
+  days: DashboardData['daily'];
+  max: number;
+}) {
+  const [okunan, setOkunan] = useState<string>('');
+
+  const oku = (gun: DashboardData['daily'][number]) =>
+    `${formatDate(gun.date)} - ${formatNumber(gun.produced)} sağlam, ` +
+    `${formatNumber(gun.scrap)} fire, ${formatNumber(gun.orders)} emir`;
+
   return (
-    <div style={{ display: 'grid', gap: '0.4rem', marginTop: '0.5rem' }}>
-      {items.map((item) => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ width: '40%', fontSize: '0.8125rem' }}>{item.label}</span>
-          <div className="mp-bar">
-            <div className="mp-bar__fill" style={{ width: `${(item.value / max) * 100}%` }} />
-          </div>
-          <strong style={{ width: '3rem', textAlign: 'right' }}>{formatNumber(item.value)}</strong>
+    <div>
+      <div className="mp-chart__legend">
+        <span className="mp-chart__key">
+          <span className="mp-chart__swatch mp-chart__swatch--produced" /> Sağlam
+        </span>
+        <span className="mp-chart__key">
+          <span className="mp-chart__swatch mp-chart__swatch--scrap" /> Fire
+        </span>
+      </div>
+
+      <div className="mp-chart">
+        <div className="mp-chart__axis" aria-hidden="true">
+          <span>{formatNumber(max)}</span>
+          <span>{formatNumber(Math.round(max / 2))}</span>
+          <span>0</span>
         </div>
-      ))}
+
+        <div className="mp-chart__plot">
+          <div className="mp-daily">
+            {days.map((gun, i) => {
+              const toplam = gun.produced + gun.scrap;
+              // Yuzde: en yuksek gun %100, cizim alaninin tam tepesi.
+              const yukseklik = max > 0 ? (toplam / max) * 100 : 0;
+              const firePay = toplam > 0 ? (gun.scrap / toplam) * 100 : 0;
+              // Ay siniri: "30 31 01 02" dizisinde ayin nerede degistigi
+              // hicbir yerde belli olmuyordu.
+              const ayBasi = i > 0 && gun.date.slice(5, 7) !== days[i - 1].date.slice(5, 7);
+              return (
+                <div
+                  key={gun.date}
+                  className={`mp-daily__bar${ayBasi ? ' mp-daily__bar--month-start' : ''}`}
+                  tabIndex={0}
+                  role="img"
+                  aria-label={oku(gun)}
+                  onMouseEnter={() => setOkunan(oku(gun))}
+                  onFocus={() => setOkunan(oku(gun))}
+                  onMouseLeave={() => setOkunan('')}
+                  onBlur={() => setOkunan('')}
+                >
+                  <div className="mp-daily__track">
+                    <div className="mp-daily__stack" style={{ height: `${yukseklik}%` }}>
+                      <div className="mp-daily__scrap" style={{ height: `${firePay}%` }} />
+                    </div>
+                  </div>
+                  <span className="mp-daily__label">
+                    {ayBasi ? gun.date.slice(5, 7) + '/' : ''}
+                    {gun.date.slice(8)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Kirpilabilen native tooltip yerine her zaman gorunen sabit satir. */}
+      <div className="mp-chart__readout" aria-live="polite">
+        {okunan || 'Bir güne gelin veya sekmeyle odaklanın.'}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Basit yatay cubuk listesi; harici grafik kutuphanesi gerektirmez.
+ *
+ * Etiket eskiden sabit %40'lik bir sutundaydi ve uzun Turkce etiketler
+ * ("Onay Bekliyor", "Uretimde") kirpiliyordu. Artik iki satirlik bir
+ * izgara: ust satirda etiket ve deger, alt satirda cubuk.
+ *
+ * DIKKAT: deger buyuklugune gore SIRALANMAZ. Hem durum hem aciliyet sirali
+ * olceklerdir (taslak -> tamamlandi, dusuk -> kritik); siralama okuyucunun
+ * bekledigi duzeni bozar.
+ */
+function BarList({ items, caption }: { items: BarItem[]; caption: string }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  const toplam = items.reduce((sum, i) => sum + i.value, 0);
+
+  return (
+    <div>
+      {/* Iki grafigin farki RENKLE degil bu satirla anlatiliyor: asil
+          karisiklik hangi popülasyonun sayildiginin hicbir yerde
+          yazmamasiydi. */}
+      <div className="mp-overline mp-barlist__caption">
+        {caption} · {formatNumber(toplam)}
+      </div>
+      <div className="mp-barlist">
+        {items.map((item) => (
+          <div key={item.label} className="mp-barlist__row">
+            <div className="mp-barlist__head">
+              <span className="mp-barlist__label">{item.label}</span>
+              <strong className="mp-barlist__value">{formatNumber(item.value)}</strong>
+            </div>
+            <div className="mp-bar">
+              <div className="mp-bar__fill" style={{ width: `${(item.value / max) * 100}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -380,10 +477,37 @@ function Schedule({
   const riskli = rows.filter((r) => r.risk === 'risk').length;
   const gecikmis = rows.filter((r) => r.risk === 'overdue').length;
 
-  // Zaman cetveli: bugunden en uzak termine kadar.
-  const bugun = Date.now();
-  const enUzak = Math.max(bugun, ...rows.map((r) => new Date(r.deadline).getTime()));
-  const aralik = Math.max(1, enUzak - bugun);
+  /*
+   * Zaman cetveli EN ERKEN BASLANGICTAN en gec termine uzanir.
+   *
+   * Onceden eksen "bugun"den basliyordu; bu yuzden bugun cizgisi her zaman
+   * %0'da, yani sol kenarda kaliyor ve hicbir bilgi tasimiyordu. Ustelik her
+   * cubugun sol kenari da 0'a kirpiliyor, termini gecmis emirler ise %2'lik
+   * gudUk bir cubuga iniyordu. Eksen iki uca da yayilinca bugun cizgisi
+   * anlamli bir yere oturuyor ve gecikme gozle goruluyor.
+   */
+  const { bugun, enErken, enGec, yuzde, bugunYuzde, sirali } = useMemo(() => {
+    const simdi = Date.now();
+    const zamanlar = rows.flatMap((r) => [
+      new Date(r.deadline).getTime(),
+      r.startedAt ? new Date(r.startedAt).getTime() : simdi,
+    ]);
+    const ilk = Math.min(simdi, ...zamanlar);
+    const son = Math.max(simdi, ...zamanlar);
+    const genislik = Math.max(1, son - ilk);
+    const oran = (t: number) => ((t - ilk) / genislik) * 100;
+    return {
+      bugun: simdi,
+      enErken: ilk,
+      enGec: son,
+      yuzde: oran,
+      bugunYuzde: oran(simdi),
+      // Merdiven okunabilir olsun diye satirlar termine gore siralanir.
+      sirali: [...rows].sort(
+        (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime(),
+      ),
+    };
+  }, [rows]);
 
   const columns = useMemo(
     () =>
@@ -457,19 +581,35 @@ function Schedule({
           ),
         },
         {
-          Header: 'Zaman Çizelgesi',
+          // Baslik bir bilesen olabilir ama `headerLabel` ZORUNLU: sutun
+          // menusu ve erisilebilirlik adi duz metin bekliyor.
+          Header: () => (
+            <div className="mp-gantt-axis">
+              <span>{formatDate(new Date(enErken).toISOString())}</span>
+              <span className="mp-gantt-axis__today" style={{ left: `${bugunYuzde}%` }}>
+                Bugün
+              </span>
+              <span>{formatDate(new Date(enGec).toISOString())}</span>
+            </div>
+          ),
+          headerLabel: 'Zaman Çizelgesi',
           id: 'timeline',
-          minWidth: 220,
+          minWidth: 260,
           disableFilters: true,
           disableSortBy: true,
           Cell: ({ row }: { row: { original: ScheduleRow } }) => {
             const o = row.original;
             const bitis = new Date(o.deadline).getTime();
             const baslangic = o.startedAt ? new Date(o.startedAt).getTime() : bugun;
-            const sol = Math.max(0, ((Math.min(baslangic, bugun) - bugun) / aralik) * 100);
-            const genislik = Math.max(2, ((bitis - Math.max(baslangic, bugun)) / aralik) * 100);
+            const sol = yuzde(Math.min(baslangic, bitis));
+            const genislik = Math.max(1.5, yuzde(Math.max(baslangic, bitis)) - sol);
             return (
-              <div className="mp-gantt" title={`${formatDate(o.deadline)} termini`}>
+              <div
+                className="mp-gantt"
+                title={`${formatDate(o.deadline)} termini`}
+              >
+                {/* Her satirda bugun izi: eksendeki "Bugün" ile ayni x'te. */}
+                <span className="mp-gantt__today" style={{ left: `${bugunYuzde}%` }} />
                 <div
                   className={`mp-gantt__bar mp-gantt__bar--${o.risk}`}
                   style={{ left: `${sol}%`, width: `${genislik}%` }}
@@ -479,7 +619,7 @@ function Schedule({
           },
         },
       ]),
-    [aralik, bugun],
+    [bugun, bugunYuzde, enErken, enGec, yuzde],
   );
 
   return (
@@ -497,7 +637,8 @@ function Schedule({
       <ListSection title="Termin Takvimi">
         <DataTable
           columns={columns}
-          data={rows}
+          headerRowHeight={52}
+          data={sirali}
           loading={loading}
           noDataText={isError ? 'Takvim yüklenemedi.' : 'Planlanacak açık emir bulunamadı.'}
         />

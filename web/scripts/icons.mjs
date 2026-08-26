@@ -49,9 +49,20 @@ function extractIcons(text) {
   /*
    * InputIcon ikonu `icon` degil `name` prop'uyla alir; yukaridaki desenlerin
    * hicbiri onu goremez. Import edilmezse ikon sessizce bos cikar.
+   *
+   * Hem sabit dizge hem kosullu bicim desteklenir:
+   *   <InputIcon name="show" />
+   *   <InputIcon name={acik ? 'hide' : 'show'} />
    */
-  for (const m of text.matchAll(/<InputIcon[^>]*?\bname\s*=\s*"([a-z0-9-]+)"/gs)) {
-    names.add(m[1]);
+  for (const m of text.matchAll(/<InputIcon\b[\s\S]*?\/>/g)) {
+    const tag = m[0];
+    for (const lit of tag.matchAll(/\bname\s*=\s*"([a-z0-9-]+)"/g)) names.add(lit[1]);
+    for (const expr of tag.matchAll(/\bname\s*=\s*\{([^}]*)\}/g)) {
+      const body = expr[1];
+      const q = body.indexOf('?');
+      const branches = q === -1 ? body : body.slice(q + 1);
+      for (const lit of branches.matchAll(/'([a-z0-9-]+)'/g)) names.add(lit[1]);
+    }
   }
 
   /*

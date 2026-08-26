@@ -7,7 +7,7 @@
  * Onceden `AllIcons.js` iceri aliniyordu; bu, ilk ikon cizilir cizilmez
  * TUM ikon veri paketinin indirilmesine yol aciyordu. UI5 bilesenleri kendi
  * ic ikonlarini (acilir ok, kapat, sirala vb.) zaten kendileri import ettigi
- * icin burada yalnizca uygulamanin acikca kullandigi 38 ikon yer alir.
+ * icin burada yalnizca uygulamanin acikca kullandigi 40 ikon yer alir.
  */
 import '@ui5/webcomponents-icons/dist/accept.js';
 import '@ui5/webcomponents-icons/dist/add.js';
@@ -27,6 +27,7 @@ import '@ui5/webcomponents-icons/dist/excel-attachment.js';
 import '@ui5/webcomponents-icons/dist/filter.js';
 import '@ui5/webcomponents-icons/dist/forward.js';
 import '@ui5/webcomponents-icons/dist/grid.js';
+import '@ui5/webcomponents-icons/dist/hide.js';
 import '@ui5/webcomponents-icons/dist/history.js';
 import '@ui5/webcomponents-icons/dist/inventory.js';
 import '@ui5/webcomponents-icons/dist/key.js';
@@ -45,5 +46,6 @@ import '@ui5/webcomponents-icons/dist/sales-order-item.js';
 import '@ui5/webcomponents-icons/dist/save.js';
 import '@ui5/webcomponents-icons/dist/settings.js';
 import '@ui5/webcomponents-icons/dist/shield.js';
+import '@ui5/webcomponents-icons/dist/show.js';
 import '@ui5/webcomponents-icons/dist/sys-find.js';
 import '@ui5/webcomponents-icons/dist/undo.js';

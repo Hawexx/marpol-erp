@@ -28,6 +28,7 @@ import { actionColumn, columns as tableColumns } from '../components/table.js';
 import { downloadOrderPdf } from '../pdf/orderPdf.js';
 import {
   Field,
+  FieldGroup,
   KpiTile,
   ListSection,
   NODE_TYPE_LABEL,
@@ -698,64 +699,98 @@ export default function OrderListPage() {
               startContent={<StatusBadge status={detail.status} />}
               endContent={
                 <>
-                  <Button
-                    icon="pdf-attachment"
-                    disabled={pdfBusy === detail.id}
-                    onClick={() => downloadPdf(detail)}
-                  >
-                    {pdfBusy === detail.id ? 'Hazırlanıyor...' : 'PDF İndir'}
-                  </Button>
-                  {can('URETIM_EMIRLERI', 'edit') &&
-                    ACTIONS.filter(
-                      (action) =>
-                        ALLOWED[detail.status].includes(action.status) &&
-                        // Onay/tamamlama/iptal ayri bir yetki: sunucu da bunu
-                        // uyguladigi icin butonu gostermek 403 ile sonuclanirdi.
-                        (!APPROVAL_STATUSES.includes(action.status) ||
-                          can('URETIM_EMIRLERI', 'approve')),
-                    ).map(
-                      (action) => (
-                        <Button
-                          key={action.status}
-                          icon={action.icon}
-                          design={action.design ?? 'Default'}
-                          disabled={changeStatus.isPending}
-                          onClick={() => {
-                            setProducedQty(String(detail.quantity));
-                            setConfirm({ order: detail, status: action.status });
-                          }}
-                        >
-                          {action.label}
-                        </Button>
-                      ),
-                    )}
                   {/*
-                    PUT /orders/:id ve DELETE /orders/:id sunucuda vardi ama
-                    arayuzden hic cagrilmiyordu: emirler yazildiktan sonra
-                    duzenlenemiyordu.
+                    Altbilgide eskiden ayni anda alti buton ve birden fazla
+                    Emphasized/Negative bulunabiliyordu; hangisinin asil eylem
+                    oldugu belli olmuyordu. Artik TEK bir birincil eylem
+                    (durumun sonraki adimi) one cikiyor, geri kalani tasma
+                    menusune iniyor.
                   */}
-                  {can('URETIM_EMRI_OLUSTUR', 'edit') &&
-                    detail.status !== 'TAMAMLANDI' &&
-                    detail.status !== 'IPTAL' && (
-                      <Button
-                        design="Transparent"
-                        icon="edit"
-                        onClick={() => navigate(`/uretim-emri-duzenle/${detail.id}`)}
-                      >
-                        Düzenle
-                      </Button>
-                    )}
-                  {can('URETIM_EMRI_OLUSTUR', 'delete') &&
-                    (detail.status === 'TASLAK' || detail.status === 'IPTAL') && (
-                      <Button
-                        design="Negative"
-                        icon="delete"
-                        disabled={removeOrder.isPending}
-                        onClick={() => setDeleteTarget(detail)}
-                      >
-                        Sil
-                      </Button>
-                    )}
+                  {(() => {
+                    const izinli = can('URETIM_EMIRLERI', 'edit')
+                      ? ACTIONS.filter(
+                          (action) =>
+                            ALLOWED[detail.status].includes(action.status) &&
+                            // Onay/tamamlama/iptal ayri bir yetki: sunucu da bunu
+                            // uyguladigi icin butonu gostermek 403 ile sonuclanirdi.
+                            (!APPROVAL_STATUSES.includes(action.status) ||
+                              can('URETIM_EMIRLERI', 'approve')),
+                        )
+                      : [];
+                    // Birincil = ilerleten ilk eylem; iptal asla birincil olmaz.
+                    const birincil = izinli.find((a) => a.design === 'Emphasized');
+                    const digerleri = izinli.filter((a) => a !== birincil);
+
+                    const basla = (status: OrderStatus) => {
+                      setProducedQty(String(detail.quantity));
+                      setConfirm({ order: detail, status });
+                    };
+
+                    return (
+                      <>
+                        {digerleri.length > 0 && (
+                          <>
+                            {digerleri.map((action) => (
+                              <Button
+                                key={action.status}
+                                design="Transparent"
+                                icon={action.icon}
+                                disabled={changeStatus.isPending}
+                                onClick={() => basla(action.status)}
+                              >
+                                {action.label}
+                              </Button>
+                            ))}
+                          </>
+                        )}
+                        <Button
+                          design="Transparent"
+                          icon="pdf-attachment"
+                          tooltip="PDF İndir"
+                          disabled={pdfBusy === detail.id}
+                          onClick={() => downloadPdf(detail)}
+                        >
+                          {pdfBusy === detail.id ? 'Hazırlanıyor...' : 'PDF'}
+                        </Button>
+                        {/*
+                          PUT /orders/:id ve DELETE /orders/:id sunucuda vardi ama
+                          arayuzden hic cagrilmiyordu: emirler yazildiktan sonra
+                          duzenlenemiyordu.
+                        */}
+                        {can('URETIM_EMRI_OLUSTUR', 'edit') &&
+                          detail.status !== 'TAMAMLANDI' &&
+                          detail.status !== 'IPTAL' && (
+                            <Button
+                              design="Transparent"
+                              icon="edit"
+                              tooltip="Düzenle"
+                              onClick={() => navigate(`/uretim-emri-duzenle/${detail.id}`)}
+                            />
+                          )}
+                        {can('URETIM_EMRI_OLUSTUR', 'delete') &&
+                          (detail.status === 'TASLAK' || detail.status === 'IPTAL') && (
+                            <Button
+                              design="Transparent"
+                              icon="delete"
+                              tooltip="Sil"
+                              disabled={removeOrder.isPending}
+                              onClick={() => setDeleteTarget(detail)}
+                            />
+                          )}
+                        {/* Tek Emphasized, en sagda. */}
+                        {birincil && (
+                          <Button
+                            design="Emphasized"
+                            icon={birincil.icon}
+                            disabled={changeStatus.isPending}
+                            onClick={() => basla(birincil.status)}
+                          >
+                            {birincil.label}
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
                   <Button design="Transparent" onClick={() => setDetail(null)}>
                     Kapat
                   </Button>
@@ -912,58 +947,107 @@ function OrderDetail({
 
   const steps = [...order.stepLogs].sort((a, b) => a.node.sortOrder - b.node.sortOrder);
 
+  // stepLogs'ta zaten duruyordu ama hicbir yerde gosterilmiyordu.
+  const toplamFire = steps.reduce((sum, st) => sum + (st.scrapQty ?? 0), 0);
+
   return (
-    <div style={{ padding: '0.5rem 0.25rem', display: 'grid', gap: '1.25rem' }}>
+    <div className="mp-detail">
+      {/* Kimlik blogu: 18 mikro alanin duvari yerine once "bu hangi emir". */}
+      <header className="mp-detail__identity">
+        <div>
+          <div className="mp-overline">Üretim Emri</div>
+          <div className="mp-detail__no">{order.orderNo}</div>
+        </div>
+        <div className="mp-detail__badges">
+          <StatusBadge status={order.status} />
+          <PriorityBadge priority={order.priority} />
+        </div>
+      </header>
+
       {overdue && (
         <MessageStrip design="Negative" hideCloseButton>
           Bu emir termin tarihini {Math.abs(remaining)} gün aşmış durumda.
         </MessageStrip>
       )}
 
-      <section>
-        <Title level="H2" size="H5">Emir Bilgileri</Title>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '0.875rem',
-            marginTop: '0.75rem',
-          }}
-        >
-          <Field label="Emir No" value={order.orderNo} />
-          <Field label="Durum" value={<StatusBadge status={order.status} />} />
-          <Field label="Aciliyet" value={<PriorityBadge priority={order.priority} />} />
-          <Field label="Müşteri" value={order.customer || '-'} />
-          <Field label="Kumaş Çeşidi" value={`${order.fabric.code} - ${order.fabric.name}`} />
-          <Field label="Flanş Çeşidi" value={`${order.flange.code} - ${order.flange.name}`} />
-          <Field label="Disk Çapı" value={`${formatNumber(order.diskDiameter, 1)} mm`} />
-          <Field label="Üretim Adedi" value={formatNumber(order.quantity)} />
-          <Field label="Katman Sayısı" value={order.layers} />
-          <Field label="Termin Tarihi" value={formatDate(order.deadline)} />
-          <Field
-            label="Kalan Süre"
-            value={
-              order.status === 'TAMAMLANDI' || order.status === 'IPTAL'
-                ? '-'
-                : remaining < 0
-                  ? `${Math.abs(remaining)} gün gecikme`
-                  : `${remaining} gün`
-            }
-          />
-          <Field label="Planlanan Başlangıç" value={formatDate(order.plannedStart)} />
-          <Field label="Üretim Başlangıcı" value={formatDateTime(order.startedAt)} />
-          <Field label="Tamamlanma" value={formatDateTime(order.completedAt)} />
-          <Field label="Üretilen Adet" value={formatNumber(order.producedQty)} />
-          <Field label="Emri Oluşturan" value={order.createdBy.fullName} />
-          <Field label="Onaylayan" value={order.approvedBy?.fullName ?? '-'} />
-          <Field label="Oluşturma" value={formatDateTime(order.createdAt)} />
-        </div>
-        {order.notes && (
-          <div style={{ marginTop: '0.875rem' }}>
-            <Field label="Üretim Notları" value={order.notes} />
-          </div>
-        )}
+      {/* Ozet en altta duruyordu; artik ilk ekranda ve one cikarilmis. */}
+      <section className="mp-callout">
+        <div className="mp-overline">Ürün Özeti</div>
+        <p className="mp-detail__summary">
+          <strong>{formatNumber(order.quantity)} adet</strong>{' '}
+          <strong>{formatNumber(order.diskDiameter, 0)} mm</strong> çapında,{' '}
+          <strong>{order.layers} katman</strong> disk cila fırçası;{' '}
+          <strong>{order.fabric.name}</strong> kumaşı{' '}
+          <strong>{order.flange.name}</strong> flanşı ile,{' '}
+          {order.chemicals.map((c) => `${c.chemical?.code} %${c.ratio}`).join(' + ')} oranındaki
+          kimyasal karışımı emdirilerek üretilecektir. Aciliyet:{' '}
+          <strong>{PRIORITY_LABEL[order.priority]}</strong>, termin:{' '}
+          <strong>{formatDate(order.deadline)}</strong>.
+        </p>
       </section>
+
+      {/*
+        auto-fit izgarasi artik 18 alana degil DORT GRUBA uygulaniyor;
+        alanlar kendi grubunun icinde kaliyor ve ilgisiz alanlar yan yana
+        dizilmiyor.
+      */}
+      <div className="mp-detail__groups">
+        <section>
+          <div className="mp-overline">Ürün</div>
+          <FieldGroup>
+            <Field label="Kumaş Çeşidi" value={`${order.fabric.code} - ${order.fabric.name}`} />
+            <Field label="Flanş Çeşidi" value={`${order.flange.code} - ${order.flange.name}`} />
+            <Field label="Disk Çapı" value={`${formatNumber(order.diskDiameter, 1)} mm`} />
+            <Field label="Katman Sayısı" value={order.layers} />
+          </FieldGroup>
+        </section>
+
+        <section>
+          <div className="mp-overline">Miktar</div>
+          <FieldGroup>
+            <Field label="Üretim Adedi" value={formatNumber(order.quantity)} />
+            <Field label="Üretilen Adet" value={formatNumber(order.producedQty)} />
+            <Field label="Toplam Fire" value={formatNumber(toplamFire)} />
+            <Field label="Müşteri" value={order.customer || '-'} />
+          </FieldGroup>
+        </section>
+
+        <section>
+          <div className="mp-overline">Zaman Çizelgesi</div>
+          <FieldGroup>
+            <Field label="Termin Tarihi" value={formatDate(order.deadline)} />
+            <Field
+              label="Kalan Süre"
+              value={
+                order.status === 'TAMAMLANDI' || order.status === 'IPTAL'
+                  ? '-'
+                  : remaining < 0
+                    ? `${Math.abs(remaining)} gün gecikme`
+                    : `${remaining} gün`
+              }
+            />
+            <Field label="Planlanan Başlangıç" value={formatDate(order.plannedStart)} />
+            <Field label="Üretim Başlangıcı" value={formatDateTime(order.startedAt)} />
+            <Field label="Tamamlanma" value={formatDateTime(order.completedAt)} />
+          </FieldGroup>
+        </section>
+
+        <section>
+          <div className="mp-overline">Kayıt</div>
+          <FieldGroup>
+            <Field label="Emri Oluşturan" value={order.createdBy.fullName} />
+            <Field label="Onaylayan" value={order.approvedBy?.fullName ?? '-'} />
+            <Field label="Oluşturma" value={formatDateTime(order.createdAt)} />
+          </FieldGroup>
+        </section>
+      </div>
+
+      {order.notes && (
+        <section>
+          <div className="mp-overline">Üretim Notları</div>
+          <p className="mp-detail__summary">{order.notes}</p>
+        </section>
+      )}
 
       <section>
         <Title level="H2" size="H5">
@@ -1126,20 +1210,6 @@ function OrderDetail({
         )}
       </section>
 
-      <section>
-        <Title level="H2" size="H5">Ürün Özeti</Title>
-        <div style={{ marginTop: '0.5rem', lineHeight: 1.7 }}>
-          <strong>{formatNumber(order.quantity)} adet</strong>{' '}
-          <strong>{formatNumber(order.diskDiameter, 0)} mm</strong> çapında,{' '}
-          <strong>{order.layers} katman</strong> disk cila fırçası;{' '}
-          <strong>{order.fabric.name}</strong> kumaşı{' '}
-          <strong>{order.flange.name}</strong> flanşı ile,{' '}
-          {order.chemicals.map((c) => `${c.chemical?.code} %${c.ratio}`).join(' + ')} oranındaki
-          kimyasal karışımı emdirilerek üretilecektir. Aciliyet:{' '}
-          <strong>{PRIORITY_LABEL[order.priority]}</strong>, termin:{' '}
-          <strong>{formatDate(order.deadline)}</strong>.
-        </div>
-      </section>
     </div>
   );
 }
