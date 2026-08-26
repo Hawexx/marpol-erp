@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
-import { BusyIndicator, Button, IllustratedMessage } from '@ui5/webcomponents-react';
+import { BusyIndicator } from '@ui5/webcomponents-react';
 
 /**
  * Bos / yukleniyor / hata ekranlari ve mesaj seritleri.
@@ -18,11 +18,19 @@ import { BusyIndicator, Button, IllustratedMessage } from '@ui5/webcomponents-re
  * baglanirsa uretec goremez ve gorsel yine sessizce kaybolur.
  */
 
-/** Gorsel verisini yalnizca bu ekranlar acildiginda indirir. */
-function useIllustrationAssets() {
-  useEffect(() => {
-    void import('../illustrations.js');
-  }, []);
+/*
+ * Gorselli ekranlar ayri bir modulde ve React.lazy ile getiriliyor.
+ * Sebep: gorsel verisi (~130 KB) yalnizca bu ekranlardan biri cizilecegi
+ * zaman inmeli, AMA cizildigi anda yukleyicinin kayitli olmasi da sart.
+ * Dinamik import'u useEffect icinde yapmak bu iki sarti ayni anda saglamaz;
+ * efekt render'dan sonra calistigi icin ilk cizimde gorsel yukleyicisi
+ * henuz kayitli olmuyor ve UI5 "No loader registered" hatasi firlatiyordu.
+ */
+const IllustratedState = lazy(() => import('./IllustratedState.js'));
+
+/** Yuklenirken yer tutar; .mp-state min-height tasidigi icin ziplama olmaz. */
+function StatePlaceholder() {
+  return <div className="mp-state" />;
 }
 
 /** Hic kayit yokken gosterilir. */
@@ -35,13 +43,10 @@ export function EmptyState({
   description?: string;
   action?: ReactNode;
 }) {
-  useIllustrationAssets();
   return (
-    <div className="mp-state">
-      <IllustratedMessage name="NoData" titleText={title} subtitleText={description}>
-        {action}
-      </IllustratedMessage>
-    </div>
+    <Suspense fallback={<StatePlaceholder />}>
+      <IllustratedState kind="empty" title={title} description={description} action={action} />
+    </Suspense>
   );
 }
 
@@ -55,17 +60,10 @@ export function ErrorState({
   description?: string;
   onRetry?: () => void;
 }) {
-  useIllustrationAssets();
   return (
-    <div className="mp-state">
-      <IllustratedMessage name="UnableToLoad" titleText={title} subtitleText={description}>
-        {onRetry && (
-          <Button design="Emphasized" onClick={onRetry}>
-            Tekrar Dene
-          </Button>
-        )}
-      </IllustratedMessage>
-    </div>
+    <Suspense fallback={<StatePlaceholder />}>
+      <IllustratedState kind="error" title={title} description={description} onRetry={onRetry} />
+    </Suspense>
   );
 }
 

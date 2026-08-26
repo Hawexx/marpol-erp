@@ -18,10 +18,29 @@ type AnalyticalTableProps = ComponentProps<typeof AnalyticalTable>;
  * referansi henuz null oldugu icin document.body uzerinden okur ve tablo
  * ilk karede titrer.
  */
+/**
+ * Tablo yuksekligi satir sayisina uyar ama iki uctan da sinirlanir.
+ *
+ * Sabit `visibleRows: 12` verildiginde uc kayitlik bir tabloda dokuz bos
+ * dolgu satiri cikiyordu. Sadece veri kadar yukseklik vermek de olmaz:
+ * bir filtre tek sonuc dondurdugunde tablo cokup altindaki sayfalayici
+ * yukari ziplar. Taban 5, tavan 12.
+ */
+const MIN_ROWS = 5;
+const MAX_ROWS = 12;
+
 export function DataTable(props: AnalyticalTableProps) {
+  const satirSayisi = Array.isArray(props.data) ? props.data.length : 0;
+  const visibleRows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, satirSayisi));
+
   return (
     <div className="ui5-content-density-compact mp-datatable">
-      <AnalyticalTable {...TABLE_DEFAULTS} {...props} />
+      <AnalyticalTable
+        {...TABLE_DEFAULTS}
+        visibleRows={visibleRows}
+        minRows={MIN_ROWS}
+        {...props}
+      />
     </div>
   );
 }

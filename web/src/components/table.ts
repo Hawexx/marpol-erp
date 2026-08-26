@@ -40,11 +40,19 @@ export function columns<T>(defs: ColumnDef<T>[]): Column[] {
 export const TABLE_DEFAULTS = {
   rowHeight: 36,
   headerRowHeight: 40,
-  visibleRows: 12,
-  minRows: 12,
   loadingDelay: 300,
   alternateRowColor: true,
 } as const;
+
+/*
+ * visibleRows / minRows BILEREK burada YOK.
+ *
+ * Once ikisi de 12'ye sabitlenmisti; sayfalar arasi ~130px'lik yukseklik
+ * ziplamasi bitti ama uc kayitlik bir tabloda dokuz bos dolgu satiri cikti.
+ * Yukseklik artik DataTable icinde satir sayisindan turetiliyor (taban 5,
+ * tavan 12): dolu tablolarin hepsi yine ayni yukseklikte, kucuk tablolar ise
+ * bos satir duvari uretmiyor.
+ */
 
 /*
  * `withRowHighlight` BILEREK burada yok.

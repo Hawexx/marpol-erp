@@ -299,6 +299,36 @@ ui5-multi-input {
   align-items: flex-end;
 }
 
+/*
+ * Filtre alanlarina SABIT piksel genislik verilmez.
+ *
+ * Denetim kaydinda alanlar 220/180/180/200/160/160px olarak elle yazilmisti;
+ * bes tanesi bir satira sigiyor, altinci (tarih secici) sarmak yerine kartin
+ * disina tasip takvim ikonu kirpiliyordu (olculen tasma: 34px). Esnek taban
+ * genislik + asgari genislik ile alanlar tasmadan bir alt satira geciyor.
+ *
+ * Tarih secicinin ic genisligi dar kutularda sikistigi icin taban 12rem.
+ */
+/* Buyume KAPALI: yoksa satirda tek basina kalan bir alan (ornegin ikinci
+   satira sarkan tarih secici) tum satiri kaplayip 857px'e uzuyordu. */
+.mp-filters__item {
+  flex: 0 1 12rem;
+  min-width: 12rem;
+  max-width: 100%;
+}
+
+/* Yalnizca arama alani artan yeri doldurur, o da bir tavana kadar. */
+.mp-filters__item--wide {
+  flex: 1 1 16rem;
+  min-width: 16rem;
+  max-width: 26rem;
+}
+
+/* Butonlar esnemez, kendi genisliginde kalir. */
+.mp-filters > ui5-button {
+  flex: 0 0 auto;
+}
+
 /* ==========================================================================
    Sayfalayici
    ==========================================================================

@@ -123,6 +123,23 @@ export default function OrderListPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<ProductionOrder | null>(null);
+
+  /*
+   * Liste satirlari TAM emir kaydi DEGILDIR: yanit boyutunu kucultmek icin
+   * sunucu listede `stepLogs` dizisini degil yalnizca sayisini donuyor
+   * (bkz. server/src/routes/orders.ts -> listInclude: `_count.stepLogs`).
+   * Detay penceresi satiri dogrudan kullandigi icin acilirken
+   * "order.stepLogs is not iterable" ile cokuyordu. Pencere acildiginda tam
+   * kayit ayrica cekilir; gelene kadar listeden gelen kismi kayit gosterilir.
+   */
+  const detailQuery = useQuery({
+    queryKey: ['/orders', detail?.id],
+    queryFn: () => api.get<ProductionOrder>(`/orders/${detail!.id}`),
+    enabled: Boolean(detail?.id),
+  });
+  /** Tam kayit geldiyse onu, gelmediyse listeden gelen kismi satiri verir. */
+  const tamKayit = (satir: ProductionOrder): ProductionOrder =>
+    detailQuery.data?.id === satir.id ? detailQuery.data : satir;
   const [confirm, setConfirm] = useState<{ order: ProductionOrder; status: OrderStatus } | null>(
     null,
   );
@@ -517,7 +534,7 @@ export default function OrderListPage() {
       {filtersOpen && (
         <Section>
           <div className="mp-filters">
-            <div style={{ minWidth: '180px' }}>
+            <div className="mp-filters__item">
               <Label showColon>Aciliyet</Label>
               <UiSelect
                 style={{ width: '100%' }}
@@ -529,7 +546,7 @@ export default function OrderListPage() {
                 onSelect={setPriorityFilter}
               />
             </div>
-            <div style={{ minWidth: '200px' }}>
+            <div className="mp-filters__item">
               <Label showColon>Müşteri</Label>
               <Input
                 style={{ width: '100%' }}
@@ -538,7 +555,7 @@ export default function OrderListPage() {
                 onInput={(e) => setCustomerFilter(e.target.value)}
               />
             </div>
-            <div style={{ minWidth: '220px' }}>
+            <div className="mp-filters__item mp-filters__item--wide">
               <Label showColon>Kumaş</Label>
               <UiSelect
                 style={{ width: '100%' }}
@@ -551,7 +568,7 @@ export default function OrderListPage() {
                 onSelect={setFabricFilter}
               />
             </div>
-            <div style={{ width: '160px' }}>
+            <div className="mp-filters__item">
               <Label showColon>Termin (baş.)</Label>
               <DatePicker
                 style={{ width: '100%' }}
@@ -561,7 +578,7 @@ export default function OrderListPage() {
                 onChange={(e) => setDeadlineFrom(e.target.value ?? '')}
               />
             </div>
-            <div style={{ width: '160px' }}>
+            <div className="mp-filters__item">
               <Label showColon>Termin (bit.)</Label>
               <DatePicker
                 style={{ width: '100%' }}
@@ -640,7 +657,13 @@ export default function OrderListPage() {
              verildiginde MEMOIZE edilmis olmali - modul kapsaminda sabit. */
           withRowHighlight
           highlightField={orderHighlight}
-          selectionMode="Multiple"
+          /* Secim sutunu tablo BOSKEN acilmaz. UI5 bu sutunun genisligini
+             tablonun DOM dugumunden okuyor (getSelectionColumnWidth); ilk
+             render'da o dugum henuz yok, genislik `undefined` donuyor ve
+             yukleme iskeleti `width: NaN` ile ciziliyor (React gelistirme
+             derlemesinde uyari veriyor). Bos tabloda zaten secilecek satir
+             yok; veri gelince sutun dogru genislikle aciliyor. */
+          selectionMode={rows.length > 0 ? 'Multiple' : 'None'}
           selectionBehavior="RowSelector"
           selectedRowIds={selectedRowIds}
           /* Varsayilanda react-table satir kimligi olarak dizi indisini kullanir;
@@ -800,14 +823,14 @@ export default function OrderListPage() {
           }
         >
           <OrderDetail
-            order={detail}
+            order={tamKayit(detail)}
             canEdit={can('URETIM_EMIRLERI', 'edit')}
             onStep={(step, status) => {
               // Bitirme miktar girisi ister; diger gecisler dogrudan uygulanir.
               if (status === 'TAMAMLANDI') {
                 const kalan =
-                  detail.quantity -
-                  detail.stepLogs.reduce(
+                  tamKayit(detail).quantity -
+                  (tamKayit(detail).stepLogs ?? []).reduce(
                     (sum, s) => (s.nodeId === step.nodeId ? sum : sum + (s.scrapQty ?? 0)),
                     0,
                   );
@@ -945,7 +968,15 @@ function OrderDetail({
   const overdue =
     remaining < 0 && order.status !== 'TAMAMLANDI' && order.status !== 'IPTAL';
 
-  const steps = [...order.stepLogs].sort((a, b) => a.node.sortOrder - b.node.sortOrder);
+  /*
+   * `stepLogs` OLMAYABILIR: liste ucu yanit boyutu icin yalnizca adim SAYISINI
+   * donuyor. Tam kayit gelene kadar (ve ileride baska bir kismi kayit
+   * gelirse) burasi cokmemeli.
+   */
+  const steps = [...(order.stepLogs ?? [])].sort(
+    (a, b) => a.node.sortOrder - b.node.sortOrder,
+  );
+  const adimlarYuklendi = Array.isArray(order.stepLogs);
 
   // stepLogs'ta zaten duruyordu ama hicbir yerde gosterilmiyordu.
   const toplamFire = steps.reduce((sum, st) => sum + (st.scrapQty ?? 0), 0);
@@ -1088,7 +1119,11 @@ function OrderDetail({
           Üretim Proses Akışı
           {order.workflow ? ` (${order.workflow.code} - ${order.workflow.name})` : ''}
         </Title>
-        {steps.length === 0 ? (
+        {!adimlarYuklendi ? (
+          <div style={{ marginTop: '0.5rem', color: 'var(--sapContent_LabelColor)' }}>
+            Adımlar yükleniyor...
+          </div>
+        ) : steps.length === 0 ? (
           <div style={{ marginTop: '0.5rem', color: 'var(--sapContent_LabelColor)' }}>
             Bu emre bir proses şeması bağlanmamış.
           </div>

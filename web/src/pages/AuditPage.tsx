@@ -155,7 +155,7 @@ export default function AuditPage() {
 
       <Section>
         <div className="mp-filters">
-          <div style={{ minWidth: '220px', flex: 1 }}>
+          <div className="mp-filters__item mp-filters__item--wide">
             <Label showColon>Ara</Label>
             <Input
               style={{ width: '100%' }}
@@ -165,7 +165,7 @@ export default function AuditPage() {
             />
           </div>
 
-          <div style={{ minWidth: '180px' }}>
+          <div className="mp-filters__item">
             <Label showColon>Eylem</Label>
             <UiSelect
               style={{ width: '100%' }}
@@ -179,7 +179,7 @@ export default function AuditPage() {
             />
           </div>
 
-          <div style={{ minWidth: '180px' }}>
+          <div className="mp-filters__item">
             <Label showColon>Kayıt Türü</Label>
             <UiSelect
               style={{ width: '100%' }}
@@ -193,7 +193,7 @@ export default function AuditPage() {
             />
           </div>
 
-          <div style={{ minWidth: '200px' }}>
+          <div className="mp-filters__item">
             <Label showColon>Kullanıcı</Label>
             <UiSelect
               style={{ width: '100%' }}
@@ -207,7 +207,7 @@ export default function AuditPage() {
             />
           </div>
 
-          <div style={{ width: '160px' }}>
+          <div className="mp-filters__item">
             <Label showColon>Başlangıç</Label>
             <DatePicker
               style={{ width: '100%' }}
@@ -218,7 +218,7 @@ export default function AuditPage() {
             />
           </div>
 
-          <div style={{ width: '160px' }}>
+          <div className="mp-filters__item">
             <Label showColon>Bitiş</Label>
             <DatePicker
               style={{ width: '100%' }}

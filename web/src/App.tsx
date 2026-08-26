@@ -1,10 +1,9 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import {
   Avatar,
   BusyIndicator,
   FlexBox,
-  IllustratedMessage,
   Menu,
   MenuItem,
   ShellBar,
@@ -15,6 +14,7 @@ import {
 } from '@ui5/webcomponents-react';
 import { useAuth } from './auth/AuthContext.js';
 import { NotificationProvider } from './components/NotificationProvider.js';
+import { ErrorState } from './components/states.js';
 import { StatusTicker } from './components/StatusTicker.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
 import { useAppTheme } from './theme/ThemeContext.js';
@@ -95,20 +95,18 @@ function PageLoading() {
 
 function NoAccess() {
   /*
-   * Gorsel (~120 KB SVG verisi) yalnizca bu ekran acildiginda indirilir.
-   * IllustratedMessage kendisi sadece BeforeSearch ve NoData'yi getirir;
-   * UnableToLoad alinmazsa gorsel hic gorunmez. Her acilista odemek yerine
-   * nadiren gorulen bu ekrana erteleniyor.
+   * Gorsel (~124 KB SVG verisi) yalnizca bu ekran acildiginda indirilir.
+   *
+   * Onceden dinamik import `useEffect` icindeydi ve IllustratedMessage ilk
+   * render'da ciziliyordu; efekt render'dan SONRA calistigi icin yukleyici
+   * henuz kayitli olmuyor, UI5 "No loader registered" hatasi firlatiyor ve
+   * ekranda gorsel hic cikmiyordu. Ortak ErrorState bileseni bu yarisi
+   * yapisal olarak cozuyor (bkz. components/IllustratedState.tsx).
    */
-  useEffect(() => {
-    void import('./illustrations.js');
-  }, []);
-
   return (
-    <IllustratedMessage
-      name="UnableToLoad"
-      titleText="Bu sayfaya erişim yetkiniz yok"
-      subtitleText="Yetki talebiniz için sistem yöneticinize başvurun."
+    <ErrorState
+      title="Bu sayfaya erişim yetkiniz yok"
+      description="Yetki talebiniz için sistem yöneticinize başvurun."
     />
   );
 }
