@@ -15,7 +15,7 @@ import {
 } from "@ui5/webcomponents-react";
 import { useEntity } from "../api/useEntity.js";
 import { useAuth } from "../auth/AuthContext.js";
-import { PageHeader, formatDateTime } from "../components/ui.js";
+import { ListSection, PageHeader, formatDateTime } from "../components/ui.js";
 import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
 import { DataToolbar } from "../components/DataToolbar.js";
@@ -239,7 +239,7 @@ export default function UsersPage() {
   const isNew = !form?.id;
 
   return (
-    <div className="mp-page">
+    <div className="mp-page mp-page--wide">
       <PageHeader
         title="Yetkilendirme Paneli"
         subtitle="Personel hesapları ve sekme bazlı erişim yetkileri"
@@ -255,22 +255,24 @@ export default function UsersPage() {
         count={total}
       />
 
-      <AnalyticalTable
-        columns={columns}
-        data={list.data ?? []}
-        loading={list.isLoading}
-        visibleRows={14}
-        filterable
-        noDataText={list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı personel bulunamadı."}
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={list.data ?? []}
+          loading={list.isLoading}
+          visibleRows={14}
+          filterable
+          noDataText={list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı personel bulunamadı."}
+        />
 
-      <Pagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        total={total}
-        busy={list.isFetching}
-        onChange={setPage}
-      />
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={list.isFetching}
+          onChange={setPage}
+        />
+      </ListSection>
 
       {form && (
         <FormDialog
@@ -390,7 +392,7 @@ export default function UsersPage() {
           </Form>
 
           <div style={{ marginTop: "1.25rem" }}>
-            <Title level="H5">Sekme Yetkileri</Title>
+            <Title level="H2" size="H5">Sekme Yetkileri</Title>
             {form.isAdmin && (
               <MessageStrip
                 design="Information"

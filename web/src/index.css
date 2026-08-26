@@ -23,66 +23,285 @@ body {
   color: var(--sapTextColor);
 }
 
-/* Sayfa govdesi */
+/* UI5'in Input/Button/Select CSS'i iceride `line-height: inherit` kullaniyor.
+   Sayfaya verdigimiz satir yuksekligi golge DOM'a sizarsa alan metinleri
+   kutunun icinde dikey olarak kayiyor. Bu kural sizintiyi kaynakta kesiyor. */
+ui5-input,
+ui5-button,
+ui5-select,
+ui5-combobox,
+ui5-date-picker,
+ui5-textarea,
+ui5-multi-input {
+  line-height: normal;
+}
+
+/* ==========================================================================
+   Sayfa ritmi
+   ==========================================================================
+
+   .mp-page artik dikey bir flex kolonu: bloklar arasi bosluk TEK bir gap'ten
+   gelir. Onceden her sayfa kendi inline marginTop/marginBottom'unu tasiyordu
+   ve ayni kalip sayfadan sayfaya farkli araliklarla ciziliyordu. */
 .mp-page {
-  padding: 1rem 1.5rem 2.5rem;
-  max-width: 1800px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mp-gap-section);
+  max-width: var(--mp-page-max);
   margin: 0 auto;
+  padding: var(--mp-page-pad-top) var(--mp-page-pad-x) var(--mp-page-pad-bottom);
+  /* line-height BODY'ye verilmez: UI5'in Input/Button CSS'i `line-height: inherit`
+     kullaniyor, golge DOM'a sizip alan metinlerinin dikey hizasini kaydiriyor. */
+  line-height: var(--mp-line-height-normal);
+}
+
+/* Genis tablolar okunabilir olcuyu asabilir. */
+.mp-page--wide {
+  max-width: 1800px;
 }
 
 .mp-page__header {
   display: flex;
-  align-items: flex-end;
+  /* flex-end idi: baslik iki satira sarinca sagdaki butonlar asagi kayiyordu. */
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--mp-gap-section);
   flex-wrap: wrap;
-  padding: 0.75rem 0 1rem;
+  padding-bottom: var(--mp-space-4);
   border-bottom: 1px solid var(--sapToolbar_SeparatorColor, #d9d9d9);
-  margin-bottom: 1rem;
+}
+
+.mp-page__header-actions {
+  display: flex;
+  gap: var(--mp-gap-inline);
+  flex-wrap: wrap;
 }
 
 .mp-page__subtitle {
   color: var(--sapContent_LabelColor);
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  font-size: var(--mp-font-size-sm);
+  line-height: var(--mp-line-height-snug);
+  margin-top: var(--mp-space-1);
+  max-width: 68ch;
 }
 
-/* Icerik karti */
-.mp-card {
+/* Kucuk ustbasliklar (eyebrow). Uc ayri yerde ayri ayri tanimlanmisti. */
+.mp-overline {
+  font-size: var(--mp-font-size-xs);
+  font-weight: var(--mp-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--mp-tracking-wide);
+  color: var(--sapContent_LabelColor);
+}
+
+/* ==========================================================================
+   Yuzey sistemi
+   ==========================================================================
+
+   Kartlarin kenarligi bugune kadar HIC cizilmiyordu: --sapTile_BorderColor
+   hem acik hem koyu Horizon'da `transparent`, dolayisiyla #e5e5e5 yedegi de
+   hicbir zaman devreye girmiyordu. Gorunur ve temaya duyarli olan
+   --sapGroup_ContentBorderColor kullaniliyor (#d9d9d9 / #323c48).
+
+   Golge icin SAP'in Shadow0-3'u kullanilamaz: Shadow0 koyu temada beyaz
+   murekkep basiyor, Shadow1-3 ise icinde 1px'lik bir halka tasiyor ve kartin
+   kendi kenarligiyla cift tel olusturuyor. tokens.css'teki kendi olcegimiz. */
+.mp-card,
+.mp-surface {
   background: var(--sapTile_Background, #fff);
-  border: 1px solid var(--sapTile_BorderColor, #e5e5e5);
+  border: var(--mp-border-subtle);
   border-radius: var(--mp-radius-md);
-  box-shadow: var(--sapContent_Shadow0);
-  padding: 1rem;
+  box-shadow: var(--mp-shadow-1);
+  padding: var(--mp-pad-card);
+  line-height: var(--mp-line-height-normal);
 }
 
-/* Ozet kutulari */
+/* Icerik kendi yuzeyini getiriyorsa (tablo, tuval) kart dolgusu kaldirilir;
+   overflow:hidden kose yuvarlamasinin icerigi kirpmasi icin gerekli. */
+.mp-surface--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.mp-surface--compact {
+  padding: var(--mp-space-3);
+}
+
+.mp-surface--quiet {
+  box-shadow: none;
+}
+
+.mp-surface--interactive {
+  cursor: pointer;
+  transition:
+    box-shadow var(--mp-transition-base),
+    transform var(--mp-transition-base);
+}
+
+/* DIKKAT: transform yeni bir containing block yaratir. Icinde AnalyticalTable
+   veya yapiskan (sticky) baslik olan bir yuzeye --interactive VERILMEZ. */
+.mp-surface--interactive:hover {
+  box-shadow: var(--mp-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.mp-surface__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mp-gap-inline);
+  margin-bottom: var(--mp-gap-stack);
+}
+
+.mp-surface--flush > .mp-surface__head {
+  margin-bottom: 0;
+  padding: var(--mp-pad-card) var(--mp-pad-card) var(--mp-space-3);
+}
+
+.mp-surface__actions {
+  display: flex;
+  gap: var(--mp-gap-inline);
+  flex-shrink: 0;
+}
+
+.mp-surface__subtitle {
+  color: var(--sapContent_LabelColor);
+  font-size: var(--mp-font-size-sm);
+  line-height: var(--mp-line-height-snug);
+  margin-top: var(--mp-space-1);
+  max-width: 68ch;
+}
+
+/* Dikey form yigini: alanlar arasi tek aralik. */
+.mp-stack {
+  display: grid;
+  gap: var(--mp-gap-stack);
+}
+
+/* Filtre alanlari: yan yana dizilir, dar ekranda kendiliginden sarar. */
+.mp-filters {
+  display: flex;
+  gap: var(--mp-gap-stack);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+/* ==========================================================================
+   Sayfalayici
+   ==========================================================================
+
+   Liste tablolari dolgusuz (--flush) bir yuzeyin icinde duruyor; sayfalayici
+   kenara yapismasin diye dolgusunu kendisi tasir ve tablodan ince bir
+   ayirici cizgiyle ayrilir. */
+.mp-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mp-gap-inline);
+  flex-wrap: wrap;
+  padding: var(--mp-space-3) var(--mp-pad-card);
+  border-top: var(--mp-border-subtle);
+  color: var(--sapContent_LabelColor);
+}
+
+/* Yuzey disinda tek basina kullanilirsa cizgi ve dolgu gereksiz. */
+.mp-surface:not(.mp-surface--flush) > .mp-pager,
+.mp-page > .mp-pager {
+  padding-inline: 0;
+  border-top: none;
+}
+
+.mp-pager__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--mp-gap-inline);
+}
+
+/* Yan yana duran, dar ekranda alt alta inen iki yuzey. */
+.mp-split {
+  display: flex;
+  gap: var(--mp-gap-section);
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.mp-split__col {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   Etiket / deger ciftleri
+   ========================================================================== */
+.mp-fieldgroup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--mp-gap-stack) var(--mp-gap-section);
+}
+
+.mp-field__label {
+  font-size: var(--mp-font-size-xs);
+  color: var(--sapContent_LabelColor);
+  line-height: var(--mp-line-height-snug);
+}
+
+.mp-field__value {
+  font-weight: var(--mp-font-weight-medium);
+  line-height: var(--mp-line-height-snug);
+}
+
+.mp-field--inline {
+  display: flex;
+  gap: var(--mp-gap-inline);
+  align-items: baseline;
+}
+
+.mp-field--inline .mp-field__label {
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Ozet kutulari (KPI)
+   ==========================================================================
+
+   Kartlarla AYNI dolgu, kenarlik ve golge. flex + space-between sayesinde
+   uzun bir etiket iki satira sardiginda kutu buyuyor ama deger satiri
+   hizada kaliyor - PlanningPage'in egri duran KPI satiri bundan kaynakliydi. */
 .mp-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  gap: var(--mp-gap-grid);
 }
 
 .mp-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--mp-space-2);
+  min-height: 6.5rem;
   background: var(--sapTile_Background, #fff);
-  border: 1px solid var(--sapTile_BorderColor, #e5e5e5);
+  border: var(--mp-border-subtle);
   border-left: 4px solid var(--sapNeutralElementColor, #6a6d70);
   border-radius: var(--mp-radius-md);
-  padding: 0.75rem 1rem;
+  box-shadow: var(--mp-shadow-1);
+  padding: var(--mp-pad-card);
 }
 
 .mp-kpi__label {
-  font-size: 0.75rem;
+  font-size: var(--mp-font-size-xs);
+  font-weight: var(--mp-font-weight-medium);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--mp-tracking-wide);
+  line-height: var(--mp-line-height-snug);
   color: var(--sapContent_LabelColor);
 }
 
 .mp-kpi__value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: var(--mp-font-size-display);
+  font-weight: var(--mp-font-weight-bold);
+  line-height: var(--mp-line-height-tight);
+  font-variant-numeric: tabular-nums;
   color: var(--sapTextColor);
 }
 
@@ -149,15 +368,28 @@ body {
 }
 
 /* Proses semasi tuvali */
+.mp-canvas-layout {
+  display: flex;
+  gap: var(--mp-gap-section);
+  align-items: flex-start;
+}
+
+.mp-node-panel {
+  width: 320px;
+  flex-shrink: 0;
+}
+
 .mp-canvas {
   position: relative;
+  flex: 1;
+  min-width: 0;
   height: 620px;
   overflow: auto;
   background-color: var(--sapGroup_ContentBackground, #fff);
   background-image: radial-gradient(circle, #d0d0d0 1px, transparent 1px);
   background-size: 20px 20px;
   border: 1px solid var(--sapGroup_ContentBorderColor, #d9d9d9);
-  border-radius: 0.5rem;
+  border-radius: var(--mp-radius-md);
 }
 
 .mp-canvas__inner {
@@ -319,13 +551,15 @@ body {
 }
 
 /* ShellBar'daki Marpol logosu.
-   Logo cubuk yuksekligini asmasin diye ShellBar da birlikte yukseltilir. */
-ui5-shellbar {
-  --_ui5_shellbar_root_height: 3.75rem;
-}
-
+   Onceden burada `--_ui5_shellbar_root_height: 3.75rem` ile cubuk 60px'e
+   yukseltiliyor ve logoya `height: 3.25rem` veriliyordu. Ikisi de sonucsuzdu:
+   UI5 slot'lanan logoyu golge DOM'da `max-height` ile sinirliyor
+   (ShellBarBranding 1.875rem / ShellBarLegacy 2rem), yani logo her halukarda
+   ~30px ciziliyor ve yukseltilmis cubuk yalnizca ~30px olu bosluk uretiyordu.
+   Private UI5 degiskeni de kaldirildi; yukseklik gerekirse public
+   `ui5-shellbar::part(root)` ile ayarlanmali. */
 .mp-shellbar__logo {
-  height: 3.25rem;
+  height: 1.75rem;
   width: auto;
   max-width: none;
   display: block;
@@ -550,10 +784,8 @@ ui5-shellbar {
 
 /* Tablet ve alti */
 @media (max-width: 1024px) {
-  .mp-page {
-    padding: 0.75rem 1rem 2rem;
-  }
-
+  /* .mp-page dolgusu tokens.css'te bu kirilma noktasinda zaten daraliyor;
+     burada tekrar edilmesi gerekmiyor. */
   .mp-kpis {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
@@ -569,31 +801,31 @@ ui5-shellbar {
     flex-direction: column;
   }
 
+  /* Genislik artik inline degil sinifta oldugu icin !important gerekmiyor. */
   .mp-canvas-layout > .mp-node-panel {
-    width: 100% !important;
+    width: 100%;
     max-width: none;
   }
 }
 
 /* Telefon */
 @media (max-width: 640px) {
-  .mp-page {
-    padding: 0.5rem 0.75rem 1.5rem;
-  }
-
   .mp-page__header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--mp-gap-inline);
   }
 
   .mp-kpis {
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
+  }
+
+  .mp-kpi {
+    min-height: 5rem;
   }
 
   .mp-kpi__value {
-    font-size: 1.25rem;
+    font-size: var(--mp-font-size-lg);
   }
 
   .mp-canvas {

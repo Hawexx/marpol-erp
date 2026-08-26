@@ -12,13 +12,17 @@ import {
   Label,
   MessageStrip,
   TextArea,
-  Title,
 } from '@ui5/webcomponents-react';
 import { api, errorMessage } from '../api/client.js';
 import { useEntity } from '../api/useEntity.js';
 import { useNotify } from '../components/NotificationProvider.js';
 import { useAuth } from '../auth/AuthContext.js';
-import { PRIORITY_LABEL, PageHeader, formatNumber } from '../components/ui.js';
+import {
+  PRIORITY_LABEL,
+  PageHeader,
+  Section,
+  formatNumber,
+} from '../components/ui.js';
 import { UiSelect } from '../components/UiSelect.js';
 import type {
   Chemical,
@@ -320,23 +324,23 @@ export default function OrderCreatePage() {
       />
 
       {isEdit && existing.isLoading && (
-        <MessageStrip design="Information" hideCloseButton style={{ marginBottom: '0.75rem' }}>
+        <MessageStrip design="Information" hideCloseButton>
           Emir yükleniyor...
         </MessageStrip>
       )}
       {isEdit && existing.isError && (
-        <MessageStrip design="Negative" hideCloseButton style={{ marginBottom: '0.75rem' }}>
+        <MessageStrip design="Negative" hideCloseButton>
           Emir yüklenemedi. Listeye dönüp tekrar deneyin.
         </MessageStrip>
       )}
 
       {warning && (
-        <MessageStrip design="Information" onClose={() => setWarning(null)} style={{ marginBottom: '0.75rem' }}>
+        <MessageStrip design="Information" onClose={() => setWarning(null)}>
           {warning}
         </MessageStrip>
       )}
 
-      <div className="mp-card">
+      <Section>
         <Form layout="S1 M2 L3 XL3">
           <FormGroup headerText="Ürün Tanımı">
             <FormItem labelContent={<Label required>Kumaş Çeşidi</Label>}>
@@ -446,26 +450,13 @@ export default function OrderCreatePage() {
             </FormItem>
           </FormGroup>
         </Form>
-      </div>
+      </Section>
 
-      <div className="mp-card" style={{ marginTop: '1rem' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
-          }}
-        >
-          <div>
-            <Title level="H5">Kumaşa Emdirilecek Kimyasal Oranlaması</Title>
-            <div className="mp-page__subtitle">
-              Hazır bir reçete seçebilir veya oranları bu emre özel girebilirsiniz.
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <Section
+        title="Kumaşa Emdirilecek Kimyasal Oranlaması"
+        subtitle="Hazır bir reçete seçebilir veya oranları bu emre özel girebilirsiniz."
+        actions={
+          <>
             <Label showColon>Reçete</Label>
             <UiSelect
               style={{ minWidth: '260px' }}
@@ -477,8 +468,9 @@ export default function OrderCreatePage() {
               }))}
               onSelect={selectRecipe}
             />
-          </div>
-        </div>
+          </>
+        }
+      >
 
         {form.chemicals.length > 0 && !ratioOk && (
           <MessageStrip design="Negative" hideCloseButton style={{ margin: '0.75rem 0' }}>
@@ -601,24 +593,26 @@ export default function OrderCreatePage() {
             Toplam: %{ratioTotal.toFixed(2)}
           </span>
         </div>
-      </div>
+      </Section>
 
-      <div className="mp-card" style={{ marginTop: '1rem' }}>
-        <Label showColon>Üretim Notları / Özel Talimatlar</Label>
-        <TextArea
-          rows={3}
-          style={{ width: '100%', marginTop: '0.25rem' }}
-          value={form.notes}
-          onInput={(e) => update({ notes: e.target.value })}
-        />
-        <div style={{ marginTop: '0.75rem' }}>
+      <Section>
+        <div className="mp-stack">
+          <div>
+            <Label showColon>Üretim Notları / Özel Talimatlar</Label>
+            <TextArea
+              rows={3}
+              style={{ width: '100%' }}
+              value={form.notes}
+              onInput={(e) => update({ notes: e.target.value })}
+            />
+          </div>
           <CheckBox
             text="Kaydettikten sonra onaya gönder (işaretlenmezse taslak olarak kalır)"
             checked={form.submitForApproval}
             onChange={(e) => update({ submitForApproval: e.target.checked })}
           />
         </div>
-      </div>
+      </Section>
     </div>
   );
 }

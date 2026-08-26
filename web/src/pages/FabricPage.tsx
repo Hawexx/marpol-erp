@@ -21,7 +21,7 @@ import {
 import { useEntity } from '../api/useEntity.js';
 import { UiSelect } from '../components/UiSelect.js';
 import { useAuth } from '../auth/AuthContext.js';
-import { PageHeader, formatNumber } from '../components/ui.js';
+import { ListSection, PageHeader, formatNumber } from '../components/ui.js';
 import { DataToolbar } from '../components/DataToolbar.js';
 import { columns as tableColumns } from '../components/table.js';
 import type { Chemical, Fabric, FabricChemical } from '../api/types.js';
@@ -210,14 +210,16 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
         count={list.data?.length}
       />
 
-      <AnalyticalTable
-        columns={columns}
-        data={list.data ?? []}
-        loading={list.isLoading}
-        visibleRows={13}
-        filterable
-        noDataText="Kayıtlı kumaş bulunamadı."
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={list.data ?? []}
+          loading={list.isLoading}
+          visibleRows={13}
+          filterable
+          noDataText="Kayıtlı kumaş bulunamadı."
+        />
+      </ListSection>
 
       {form && (
         <Dialog
@@ -327,7 +329,7 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
             </Form>
 
             <div style={{ marginTop: '1.25rem' }}>
-              <Title level="H5">Emdirilecek Kimyasallar</Title>
+              <Title level="H2" size="H5">Emdirilecek Kimyasallar</Title>
               <div className="mp-page__subtitle" style={{ marginBottom: '0.5rem' }}>
                 Bu kumaş için varsayılan kimyasal oranları. Üretim emrinde reçete
                 seçilmezse bu oranlar referans alınır.
@@ -528,14 +530,16 @@ function ChemicalsTab({ canEdit }: { canEdit: CanFn }) {
         count={list.data?.length}
       />
 
-      <AnalyticalTable
-        columns={columns}
-        data={list.data ?? []}
-        loading={list.isLoading}
-        visibleRows={13}
-        filterable
-        noDataText="Kayıtlı kimyasal bulunamadı."
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={list.data ?? []}
+          loading={list.isLoading}
+          visibleRows={13}
+          filterable
+          noDataText="Kayıtlı kimyasal bulunamadı."
+        />
+      </ListSection>
 
       {form && (
         <Dialog

@@ -35,12 +35,121 @@ export function PageHeader({
   return (
     <div className="mp-page__header">
       <div>
-        <Title level="H3">{title}</Title>
+        {/* UI5'te bir basligin GORSEL boyutunu `level` degil `size` belirler;
+            `size` verilmezse varsayilani "H5"tir. Yani `level="H3"` yazan eski
+            kod sayfa basligini kart baslikariyla ayni 16px'te ciziyordu.
+            `level` semantik (h1), `size` gorsel (24px) olarak ayrilir. */}
+        <Title level="H1" size="H3">
+          {title}
+        </Title>
         {subtitle && <div className="mp-page__subtitle">{subtitle}</div>}
       </div>
-      {actions && <div style={{ display: 'flex', gap: '0.5rem' }}>{actions}</div>}
+      {actions && <div className="mp-page__header-actions">{actions}</div>}
     </div>
   );
+}
+
+/**
+ * Sayfa icindeki icerik blogu: kenarlikli, golgeli yuzey + istege bagli baslik.
+ *
+ * Onceden her sayfa `<div className="mp-card">` yazip baslik ve araligi kendi
+ * inline stiliyle kuruyordu; ayni kalip sayfadan sayfaya farkli goruniyordu.
+ */
+export function Section({
+  title,
+  subtitle,
+  actions,
+  /** Icerik kendi yuzeyini getiriyorsa (tablo, tuval) kart dolgusunu kaldirir. */
+  flush = false,
+  compact = false,
+  className,
+  children,
+}: {
+  title?: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  flush?: boolean;
+  compact?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const classes = [
+    'mp-surface',
+    flush ? 'mp-surface--flush' : '',
+    compact ? 'mp-surface--compact' : '',
+    className ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <section className={classes}>
+      {(title || actions) && (
+        <div className="mp-surface__head">
+          <div>
+            {title && (
+              <Title level="H2" size="H5">
+                {title}
+              </Title>
+            )}
+            {subtitle && <div className="mp-surface__subtitle">{subtitle}</div>}
+          </div>
+          {actions && <div className="mp-surface__actions">{actions}</div>}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Tablo tasiyan bolum: tablo kenardan kenara otursun diye dolgusuz yuzey. */
+export function ListSection({
+  title,
+  subtitle,
+  actions,
+  className,
+  children,
+}: {
+  title?: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Section flush title={title} subtitle={subtitle} actions={actions} className={className}>
+      {children}
+    </Section>
+  );
+}
+
+/**
+ * Etiket + deger cifti.
+ *
+ * `stack` (varsayilan) etiketi degerin ustune koyar - emir detayinda kullanilir.
+ * `inline` yan yana dizer - denetim kaydi ayrintisinda kullanilir. Iki sayfa
+ * bu kalibi ayri ayri kopyalamisti.
+ */
+export function Field({
+  label,
+  value,
+  orientation = 'stack',
+}: {
+  label: string;
+  value: ReactNode;
+  orientation?: 'stack' | 'inline';
+}) {
+  return (
+    <div className={orientation === 'inline' ? 'mp-field mp-field--inline' : 'mp-field'}>
+      <div className="mp-field__label">{orientation === 'inline' ? `${label}:` : label}</div>
+      <div className="mp-field__value">{value ?? '-'}</div>
+    </div>
+  );
+}
+
+/** Field'lari esit genislikli, kendiliginden saran bir izgaraya dizer. */
+export function FieldGroup({ children }: { children: ReactNode }) {
+  return <div className="mp-fieldgroup">{children}</div>;
 }
 
 export function KpiTile({

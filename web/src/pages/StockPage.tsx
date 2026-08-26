@@ -20,7 +20,7 @@ import { UiSelect } from '../components/UiSelect.js';
 import { columns as tableColumns } from '../components/table.js';
 import { useDebounced } from '../lib/useDebounced.js';
 import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
-import { PageHeader, STOCK_REASON_LABEL, formatDateTime, formatNumber } from '../components/ui.js';
+import { ListSection, PageHeader, STOCK_REASON_LABEL, formatDateTime, formatNumber } from '../components/ui.js';
 import type { StockMovement, StockReason, StockRow } from '../api/types.js';
 
 const PAGE_SIZE = 50;
@@ -225,14 +225,14 @@ export default function StockPage() {
   const lowRows = alerts.data?.rows ?? [];
 
   return (
-    <div className="mp-page">
+    <div className="mp-page mp-page--wide">
       <PageHeader
         title="Stok Takibi"
         subtitle="Kimyasal stok seviyeleri, hareketler ve kritik seviye uyarıları"
       />
 
       {lowRows.length > 0 && (
-        <MessageStrip design="Negative" hideCloseButton style={{ marginBottom: '0.75rem' }}>
+        <MessageStrip design="Negative" hideCloseButton>
           <strong>{lowRows.length} kimyasal kritik seviyede:</strong>{' '}
           {lowRows
             .slice(0, 5)
@@ -243,7 +243,7 @@ export default function StockPage() {
       )}
 
       {stock.isError && (
-        <MessageStrip design="Negative" hideCloseButton style={{ marginBottom: '0.5rem' }}>
+        <MessageStrip design="Negative" hideCloseButton>
           Stok verileri yüklenemedi. {errorMessage(stock.error)}
         </MessageStrip>
       )}
@@ -267,22 +267,24 @@ export default function StockPage() {
         }
       />
 
-      <AnalyticalTable
-        columns={columns}
-        data={stock.data?.rows ?? []}
-        loading={stock.isLoading}
-        visibleRows={14}
-        filterable
-        noDataText={stock.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kimyasal bulunamadı.'}
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={stock.data?.rows ?? []}
+          loading={stock.isLoading}
+          visibleRows={14}
+          filterable
+          noDataText={stock.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kimyasal bulunamadı.'}
+        />
 
-      <Pagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        total={stock.data?.total ?? 0}
-        busy={stock.isFetching}
-        onChange={setPage}
-      />
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={stock.data?.total ?? 0}
+          busy={stock.isFetching}
+          onChange={setPage}
+        />
+      </ListSection>
 
       {moveForm && (
         <Dialog

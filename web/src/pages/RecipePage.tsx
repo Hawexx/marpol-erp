@@ -18,7 +18,7 @@ import { api } from "../api/client.js";
 import { useEntity } from "../api/useEntity.js";
 import { UiSelect } from "../components/UiSelect.js";
 import { useAuth } from "../auth/AuthContext.js";
-import { PageHeader, formatNumber } from "../components/ui.js";
+import { ListSection, PageHeader, formatNumber } from "../components/ui.js";
 import { DataToolbar } from "../components/DataToolbar.js";
 import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
@@ -216,24 +216,26 @@ export default function RecipePage() {
         exportBusy={exportBusy}
       />
 
-      <AnalyticalTable
-        columns={columns}
-        data={list.data ?? []}
-        loading={list.isLoading}
-        visibleRows={14}
-        filterable
-        noDataText={
-          list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı reçete bulunamadı."
-        }
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={list.data ?? []}
+          loading={list.isLoading}
+          visibleRows={14}
+          filterable
+          noDataText={
+            list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı reçete bulunamadı."
+          }
+        />
 
-      <Pagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        total={total}
-        busy={list.isFetching}
-        onChange={setPage}
-      />
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={list.isFetching}
+          onChange={setPage}
+        />
+      </ListSection>
 
       {form && (
         <FormDialog
@@ -329,7 +331,7 @@ export default function RecipePage() {
           </Form>
 
           <div style={{ marginTop: "1.25rem" }}>
-            <Title level="H5">Reçete Bileşenleri</Title>
+            <Title level="H2" size="H5">Reçete Bileşenleri</Title>
             {!totalOk && form.items.length > 0 && (
               <MessageStrip
                 design="Negative"

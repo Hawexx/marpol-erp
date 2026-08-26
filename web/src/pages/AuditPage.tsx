@@ -8,15 +8,18 @@ import {
   Input,
   Label,
   ObjectStatus,
-  Text,
 } from '@ui5/webcomponents-react';
 import { api } from '../api/client.js';
+import { Pagination } from '../components/Pagination.js';
 import { UiSelect } from '../components/UiSelect.js';
 import { columns as tableColumns } from '../components/table.js';
 import {
   AUDIT_ACTION_LABEL,
   AUDIT_ENTITY_LABEL,
+  Field,
+  ListSection,
   PageHeader,
+  Section,
   formatDateTime,
   trToIsoDate,
 } from '../components/ui.js';
@@ -78,7 +81,6 @@ export default function AuditPage() {
   });
 
   const total = logs.data?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   /** Filtre degisince ilk sayfaya don; aksi halde bos sayfada kalinir. */
   function applyFilter(fn: () => void) {
@@ -147,21 +149,14 @@ export default function AuditPage() {
   );
 
   return (
-    <div className="mp-page">
+    <div className="mp-page mp-page--wide">
       <PageHeader
         title="Denetim Kaydı"
         subtitle="Sistemde yapılan işlemlerin değiştirilemez kaydı"
       />
 
-      <div className="mp-card" style={{ marginBottom: '0.75rem' }}>
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.75rem',
-            flexWrap: 'wrap',
-            alignItems: 'flex-end',
-          }}
-        >
+      <Section>
+        <div className="mp-filters">
           <div style={{ minWidth: '220px', flex: 1 }}>
             <Label showColon>Ara</Label>
             <Input
@@ -256,48 +251,27 @@ export default function AuditPage() {
             Yenile
           </Button>
         </div>
-      </div>
+      </Section>
 
-      <AnalyticalTable
-        columns={columns}
-        data={logs.data?.rows ?? []}
-        loading={logs.isLoading}
-        visibleRows={15}
-        noDataText={
-          logs.isError ? 'Kayıtlar yüklenemedi.' : 'Bu filtrelerle denetim kaydı bulunamadı.'
-        }
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={logs.data?.rows ?? []}
+          loading={logs.isLoading}
+          visibleRows={15}
+          noDataText={
+            logs.isError ? 'Kayıtlar yüklenemedi.' : 'Bu filtrelerle denetim kaydı bulunamadı.'
+          }
+        />
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: '0.75rem',
-        }}
-      >
-        <Text>
-          Toplam {total} kayıt · Sayfa {page} / {pageCount}
-        </Text>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <Button
-            design="Transparent"
-            icon="navigation-left-arrow"
-            disabled={page <= 1 || logs.isFetching}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Önceki
-          </Button>
-          <Button
-            design="Transparent"
-            icon="navigation-right-arrow"
-            disabled={page >= pageCount || logs.isFetching}
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-          >
-            Sonraki
-          </Button>
-        </div>
-      </div>
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={logs.isFetching}
+          onChange={setPage}
+        />
+      </ListSection>
 
       {detail && (
         <Dialog
@@ -318,8 +292,8 @@ export default function AuditPage() {
           }
         >
           <div style={{ display: 'grid', gap: '0.6rem', minWidth: 'min(560px, 80vw)' }}>
-            <Row label="Tarih" value={formatDateTime(detail.createdAt)} />
-            <Row
+            <Field orientation="inline" label="Tarih" value={formatDateTime(detail.createdAt)} />
+            <Field orientation="inline"
               label="Kullanıcı"
               value={
                 detail.user
@@ -327,8 +301,8 @@ export default function AuditPage() {
                   : '(silinmiş kullanıcı)'
               }
             />
-            <Row label="Kayıt No" value={detail.entityId ?? '-'} />
-            <Row label="IP" value={detail.ip ?? '-'} />
+            <Field orientation="inline" label="Kayıt No" value={detail.entityId ?? '-'} />
+            <Field orientation="inline" label="IP" value={detail.ip ?? '-'} />
             <div>
               <Label showColon>Değişiklik Ayrıntısı</Label>
               <pre className="mp-audit-detail">
@@ -338,17 +312,6 @@ export default function AuditPage() {
           </div>
         </Dialog>
       )}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', gap: '0.5rem' }}>
-      <Label showColon style={{ minWidth: '110px' }}>
-        {label}
-      </Label>
-      <Text>{value}</Text>
     </div>
   );
 }

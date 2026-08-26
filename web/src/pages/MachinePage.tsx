@@ -14,7 +14,7 @@ import {
 import { api } from "../api/client.js";
 import { useEntity } from "../api/useEntity.js";
 import { useAuth } from "../auth/AuthContext.js";
-import { PageHeader, formatNumber } from "../components/ui.js";
+import { ListSection, PageHeader, formatNumber } from "../components/ui.js";
 import { DataToolbar } from "../components/DataToolbar.js";
 import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
@@ -156,24 +156,26 @@ export default function MachinePage() {
         exportBusy={exportBusy}
       />
 
-      <AnalyticalTable
-        columns={columns}
-        data={list.data ?? []}
-        loading={list.isLoading}
-        visibleRows={14}
-        filterable
-        noDataText={
-          list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı makine bulunamadı."
-        }
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={list.data ?? []}
+          loading={list.isLoading}
+          visibleRows={14}
+          filterable
+          noDataText={
+            list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı makine bulunamadı."
+          }
+        />
 
-      <Pagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        total={total}
-        busy={list.isFetching}
-        onChange={setPage}
-      />
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={list.isFetching}
+          onChange={setPage}
+        />
+      </ListSection>
 
       {form && (
         <FormDialog

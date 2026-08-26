@@ -20,22 +20,13 @@ export function Pagination({
   const last = Math.min(page * pageSize, total);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '0.5rem',
-        flexWrap: 'wrap',
-        marginTop: '0.75rem',
-      }}
-    >
+    <div className="mp-pager">
       <Text>
         {total === 0
           ? 'Kayıt yok'
           : `${formatNumber(first)}-${formatNumber(last)} / ${formatNumber(total)} kayıt`}
       </Text>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="mp-pager__nav">
         <Button
           design="Transparent"
           icon="navigation-left-arrow"

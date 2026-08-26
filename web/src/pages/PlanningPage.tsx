@@ -8,16 +8,17 @@ import {
   Tab,
   TabContainer,
   Text,
-  Title,
 } from '@ui5/webcomponents-react';
 import { api, errorMessage } from '../api/client.js';
 import { columns as tableColumns } from '../components/table.js';
 import {
   KpiTile,
+  ListSection,
   PRIORITY_LABEL,
   PageHeader,
   PriorityBadge,
   STATUS_LABEL,
+  Section,
   StatusBadge,
   formatDate,
   formatNumber,
@@ -83,7 +84,7 @@ export default function PlanningPage() {
   const d = dashboard.data;
 
   return (
-    <div className="mp-page">
+    <div className="mp-page mp-page--wide">
       <PageHeader
         title="Üretim Planlama"
         subtitle="Üretim panosu, makine yükü ve termin takvimi"
@@ -103,7 +104,7 @@ export default function PlanningPage() {
       />
 
       {dashboard.isError && (
-        <MessageStrip design="Negative" hideCloseButton style={{ marginBottom: '0.75rem' }}>
+        <MessageStrip design="Negative" hideCloseButton>
           Pano verileri yüklenemedi. {errorMessage(dashboard.error)}
         </MessageStrip>
       )}
@@ -139,14 +140,14 @@ export default function PlanningPage() {
 }
 
 function Dashboard({ data, loading }: { data?: DashboardData; loading: boolean }) {
-  if (loading && !data) return <div className="mp-card">Yükleniyor...</div>;
+  if (loading && !data) return <Section>Yükleniyor...</Section>;
   if (!data) return null;
 
   const enYuksekGunluk = Math.max(1, ...data.daily.map((g) => g.produced + g.scrap));
 
   return (
     <>
-      <div className="mp-kpis" style={{ marginTop: '0.75rem' }}>
+      <div className="mp-kpis">
         <KpiTile label="Açık Emir" value={formatNumber(data.openOrders)} tone="info" />
         <KpiTile
           label="Bu Hafta Terminli"
@@ -166,30 +167,27 @@ function Dashboard({ data, loading }: { data?: DashboardData; loading: boolean }
         />
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-        <div className="mp-card" style={{ flex: '1 1 320px', minWidth: 0 }}>
-          <Title level="H5">Durum Dağılımı</Title>
+      <div className="mp-split">
+        <Section title="Durum Dağılımı" className="mp-split__col">
           <BarList
             items={(Object.keys(STATUS_LABEL) as OrderStatus[]).map((s) => ({
               label: STATUS_LABEL[s],
               value: data.byStatus[s] ?? 0,
             }))}
           />
-        </div>
+        </Section>
 
-        <div className="mp-card" style={{ flex: '1 1 320px', minWidth: 0 }}>
-          <Title level="H5">Açık Emirlerde Aciliyet</Title>
+        <Section title="Açık Emirlerde Aciliyet" className="mp-split__col">
           <BarList
             items={(Object.keys(PRIORITY_LABEL) as Priority[]).map((p) => ({
               label: PRIORITY_LABEL[p],
               value: data.byPriority[p] ?? 0,
             }))}
           />
-        </div>
+        </Section>
       </div>
 
-      <div className="mp-card" style={{ marginTop: '1rem' }}>
-        <Title level="H5">Son 30 Gün Üretimi</Title>
+      <Section title="Son 30 Gün Üretimi">
         {data.daily.length === 0 ? (
           <Text>Bu dönemde tamamlanmış emir yok.</Text>
         ) : (
@@ -215,7 +213,7 @@ function Dashboard({ data, loading }: { data?: DashboardData; loading: boolean }
             })}
           </div>
         )}
-      </div>
+      </Section>
     </>
   );
 }
@@ -315,20 +313,22 @@ function MachineLoad({
 
   return (
     <>
-      <MessageStrip design="Information" hideCloseButton style={{ margin: '0.75rem 0' }}>
+      <MessageStrip design="Information" hideCloseButton>
         Süreler, adımın sabit işlem süresi ile adedin makine kapasitesine bölünmesiyle
         hesaplanır. Vardiya 8 saat kabul edilmiştir. Kapasitesi girilmemiş makinelerde yalnızca
         sabit süre sayılır.
       </MessageStrip>
-      <AnalyticalTable
-        columns={columns}
-        data={rows}
-        loading={loading}
-        visibleRows={12}
-        noDataText={
-          isError ? 'Makine yükü yüklenemedi.' : 'Aktif makine veya bekleyen iş bulunamadı.'
-        }
-      />
+      <ListSection title="Makine Yükü">
+        <AnalyticalTable
+          columns={columns}
+          data={rows}
+          loading={loading}
+          visibleRows={12}
+          noDataText={
+            isError ? 'Makine yükü yüklenemedi.' : 'Aktif makine veya bekleyen iş bulunamadı.'
+          }
+        />
+      </ListSection>
     </>
   );
 }
@@ -450,7 +450,7 @@ function Schedule({
   return (
     <>
       {(riskli > 0 || gecikmis > 0) && (
-        <MessageStrip design="Critical" hideCloseButton style={{ margin: '0.75rem 0' }}>
+        <MessageStrip design="Critical" hideCloseButton>
           {gecikmis > 0 && <strong>{gecikmis} emir gecikmiş. </strong>}
           {riskli > 0 && (
             <>
@@ -459,13 +459,15 @@ function Schedule({
           )}
         </MessageStrip>
       )}
-      <AnalyticalTable
-        columns={columns}
-        data={rows}
-        loading={loading}
-        visibleRows={12}
-        noDataText={isError ? 'Takvim yüklenemedi.' : 'Planlanacak açık emir bulunamadı.'}
-      />
+      <ListSection title="Termin Takvimi">
+        <AnalyticalTable
+          columns={columns}
+          data={rows}
+          loading={loading}
+          visibleRows={12}
+          noDataText={isError ? 'Takvim yüklenemedi.' : 'Planlanacak açık emir bulunamadı.'}
+        />
+      </ListSection>
     </>
   );
 }

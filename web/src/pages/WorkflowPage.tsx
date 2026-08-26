@@ -13,11 +13,14 @@ import {
   MessageStrip,
   Text,
   TextArea,
-  Title,
 } from '@ui5/webcomponents-react';
 import { useEntity } from '../api/useEntity.js';
 import { useAuth } from '../auth/AuthContext.js';
-import { NODE_TYPE_LABEL, PageHeader } from '../components/ui.js';
+import {
+  NODE_TYPE_LABEL,
+  PageHeader,
+  Section,
+} from '../components/ui.js';
 import { newId } from '../lib/id.js';
 import { UiSelect } from '../components/UiSelect.js';
 import type { Machine, NodeType, Workflow, WorkflowEdge, WorkflowNode } from '../api/types.js';
@@ -344,7 +347,7 @@ export default function WorkflowPage() {
   const selectedNode = draft?.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
   return (
-    <div className="mp-page">
+    <div className="mp-page mp-page--wide">
       <PageHeader
         title="İş Akışı ve Üretim Proses Şemaları"
         subtitle="Ürünün hangi adımlardan ve makine hattından geçeceğini tanımlayın"
@@ -383,7 +386,7 @@ export default function WorkflowPage() {
       />
 
       {error && (
-        <MessageStrip design="Negative" onClose={() => setError(null)} style={{ marginBottom: '0.75rem' }}>
+        <MessageStrip design="Negative" onClose={() => setError(null)}>
           {error}
         </MessageStrip>
       )}
@@ -453,15 +456,12 @@ export default function WorkflowPage() {
       )}
 
       {!draft ? (
-        <div className="mp-card">
+        <Section>
           <Text>Görüntülemek için bir proses şeması seçin veya yeni bir şema oluşturun.</Text>
-        </div>
+        </Section>
       ) : (
-        <div
-          className="mp-canvas-layout"
-          style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}
-        >
-          <div className="mp-canvas" ref={canvasRef} style={{ flex: 1, minWidth: 0 }}>
+        <div className="mp-canvas-layout">
+          <div className="mp-canvas" ref={canvasRef}>
             <div className="mp-canvas__inner">
               <EdgeLayer
                 nodes={draft.nodes}
@@ -556,14 +556,11 @@ export default function WorkflowPage() {
             </div>
           </div>
 
-          <div className="mp-card mp-node-panel" style={{ width: '320px', flexShrink: 0 }}>
-            <Title level="H5">Adım Özellikleri</Title>
+          <Section className="mp-node-panel" title="Adım Özellikleri">
             {!selectedNode ? (
-              <Text style={{ display: 'block', marginTop: '0.75rem' }}>
-                Düzenlemek için tuvalden bir adım seçin.
-              </Text>
+              <Text>Düzenlemek için tuvalden bir adım seçin.</Text>
             ) : (
-              <div style={{ display: 'grid', gap: '0.625rem', marginTop: '0.75rem' }}>
+              <div className="mp-stack">
                 <div>
                   <Label showColon>Adım Tipi</Label>
                   <UiSelect
@@ -668,7 +665,7 @@ export default function WorkflowPage() {
                 )}
               </div>
             )}
-          </div>
+          </Section>
         </div>
       )}
 

@@ -27,13 +27,16 @@ import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
 import { columns as tableColumns } from '../components/table.js';
 import { downloadOrderPdf } from '../pdf/orderPdf.js';
 import {
+  Field,
   KpiTile,
+  ListSection,
   NODE_TYPE_LABEL,
   PRIORITY_LABEL,
   PageHeader,
   PriorityBadge,
   STATUS_LABEL,
   STEP_LABEL,
+  Section,
   StatusBadge,
   daysUntil,
   formatDate,
@@ -467,7 +470,7 @@ export default function OrderListPage() {
   const allOnPageSelected = rows.length > 0 && rows.every((o) => selected.has(o.id));
 
   return (
-    <div className="mp-page">
+    <div className="mp-page mp-page--wide">
       <PageHeader
         title="Üretim Emirleri"
         subtitle="Üretim hattına düşen emirler, durumları ve proses ilerlemeleri"
@@ -528,8 +531,8 @@ export default function OrderListPage() {
       />
 
       {filtersOpen && (
-        <div className="mp-card" style={{ marginBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <Section>
+          <div className="mp-filters">
             <div style={{ minWidth: '180px' }}>
               <Label showColon>Aciliyet</Label>
               <UiSelect
@@ -598,15 +601,11 @@ export default function OrderListPage() {
               Temizle
             </Button>
           </div>
-        </div>
+        </Section>
       )}
 
       {selected.size > 0 && can('URETIM_EMIRLERI', 'edit') && (
-        <MessageStrip
-          design="Information"
-          hideCloseButton
-          style={{ marginBottom: '0.5rem' }}
-        >
+        <MessageStrip design="Information" hideCloseButton>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <span>{selected.size} emir seçildi.</span>
             {can('URETIM_EMIRLERI', 'approve') && (
@@ -661,30 +660,32 @@ export default function OrderListPage() {
         />
       </div>
 
-      <AnalyticalTable
-        columns={columns}
-        data={rows}
-        loading={orders.isLoading}
-        visibleRows={13}
-        filterable
-        noDataText={
-          orders.isError
-            ? 'Kayıtlar yüklenemedi.'
-            : 'Bu filtrelerle görüntülenecek üretim emri bulunamadı.'
-        }
-        onRowClick={(e) => {
-          const row = e.detail.row?.original as ProductionOrder | undefined;
-          if (row) setDetail(row);
-        }}
-      />
+      <ListSection>
+        <AnalyticalTable
+          columns={columns}
+          data={rows}
+          loading={orders.isLoading}
+          visibleRows={13}
+          filterable
+          noDataText={
+            orders.isError
+              ? 'Kayıtlar yüklenemedi.'
+              : 'Bu filtrelerle görüntülenecek üretim emri bulunamadı.'
+          }
+          onRowClick={(e) => {
+            const row = e.detail.row?.original as ProductionOrder | undefined;
+            if (row) setDetail(row);
+          }}
+        />
 
-      <Pagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        total={total}
-        busy={orders.isFetching}
-        onChange={setPage}
-      />
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={orders.isFetching}
+          onChange={setPage}
+        />
+      </ListSection>
 
       {detail && (
         <Dialog
@@ -897,15 +898,6 @@ export default function OrderListPage() {
 // EMIR DETAYI
 // ---------------------------------------------------------------------------
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontSize: '0.75rem', color: 'var(--sapContent_LabelColor)' }}>{label}</div>
-      <div style={{ fontWeight: 600 }}>{value ?? '-'}</div>
-    </div>
-  );
-}
-
 function OrderDetail({
   order,
   canEdit,
@@ -930,7 +922,7 @@ function OrderDetail({
       )}
 
       <section>
-        <Title level="H5">Emir Bilgileri</Title>
+        <Title level="H2" size="H5">Emir Bilgileri</Title>
         <div
           style={{
             display: 'grid',
@@ -975,7 +967,7 @@ function OrderDetail({
       </section>
 
       <section>
-        <Title level="H5">
+        <Title level="H2" size="H5">
           Kimyasal Oranlaması
           {order.recipe ? ` (Reçete: ${order.recipe.code} - ${order.recipe.name})` : ''}
         </Title>
@@ -1007,7 +999,7 @@ function OrderDetail({
       </section>
 
       <section>
-        <Title level="H5">
+        <Title level="H2" size="H5">
           Üretim Proses Akışı
           {order.workflow ? ` (${order.workflow.code} - ${order.workflow.name})` : ''}
         </Title>
@@ -1132,7 +1124,7 @@ function OrderDetail({
       </section>
 
       <section>
-        <Title level="H5">Ürün Özeti</Title>
+        <Title level="H2" size="H5">Ürün Özeti</Title>
         <div style={{ marginTop: '0.5rem', lineHeight: 1.7 }}>
           <strong>{formatNumber(order.quantity)} adet</strong>{' '}
           <strong>{formatNumber(order.diskDiameter, 0)} mm</strong> çapında,{' '}
