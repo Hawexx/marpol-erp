@@ -3,7 +3,9 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@ui5/webcomponents-react';
-import '@ui5/webcomponents-icons/dist/AllIcons.js';
+// Tum ikon setini (~1,1 MB) degil, yalnizca kullanilanlari yukler.
+// Liste uretilir: npm run icons -w web
+import './icons.js';
 import '@ui5/webcomponents-react/dist/Assets.js';
 import App from './App.js';
 import { AppThemeProvider } from './theme/ThemeContext.js';

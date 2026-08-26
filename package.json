@@ -18,11 +18,12 @@
     "dev": "concurrently -n API,WEB -c red,blue \"npm:dev:server\" \"npm:dev:web\"",
     "build": "npm run build -w server && npm run build -w web",
     "setup": "npm install && npm run db:up && npm run prisma:migrate && npm run seed",
-    "lint": "eslint server/src web/src",
+    "lint": "npm run icons:check -w web && eslint server/src web/src",
     "lint:fix": "eslint server/src web/src --fix",
     "prisma:migrate": "npm run prisma:migrate -w server",
     "prisma:deploy": "npm run prisma:deploy -w server",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server",
+    "icons": "npm run icons -w web"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import {
   Avatar,
@@ -74,6 +74,16 @@ function PageLoading() {
 }
 
 function NoAccess() {
+  /*
+   * Gorsel (~120 KB SVG verisi) yalnizca bu ekran acildiginda indirilir.
+   * IllustratedMessage kendisi sadece BeforeSearch ve NoData'yi getirir;
+   * UnableToLoad alinmazsa gorsel hic gorunmez. Her acilista odemek yerine
+   * nadiren gorulen bu ekrana erteleniyor.
+   */
+  useEffect(() => {
+    void import('./illustrations.js');
+  }, []);
+
   return (
     <IllustratedMessage
       name="UnableToLoad"
