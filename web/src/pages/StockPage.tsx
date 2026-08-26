@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AnalyticalTable,
   Bar,
   Button,
   CheckBox,
@@ -17,7 +16,8 @@ import { useNotify } from '../components/NotificationProvider.js';
 import { DataToolbar } from '../components/DataToolbar.js';
 import { Pagination } from '../components/Pagination.js';
 import { UiSelect } from '../components/UiSelect.js';
-import { columns as tableColumns } from '../components/table.js';
+import { DataTable } from '../components/DataTable.js';
+import { actionColumn, columns as tableColumns } from '../components/table.js';
 import { useDebounced } from '../lib/useDebounced.js';
 import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
 import { ListSection, PageHeader, STOCK_REASON_LABEL, formatDateTime, formatNumber } from '../components/ui.js';
@@ -173,11 +173,7 @@ export default function StockPage() {
         },
         { Header: 'Tedarikçi', accessor: 'supplier', width: 170 },
         {
-          Header: 'İşlem',
-          id: 'actions',
-          width: 210,
-          disableFilters: true,
-          disableSortBy: true,
+          ...actionColumn(3),
           Cell: ({ row }: { row: { original: StockRow } }) => (
             <div className="mp-inline-actions">
               {canMove && (
@@ -268,11 +264,10 @@ export default function StockPage() {
       />
 
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={stock.data?.rows ?? []}
           loading={stock.isLoading}
-          visibleRows={14}
           filterable
           noDataText={stock.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kimyasal bulunamadı.'}
         />
@@ -457,46 +452,48 @@ export default function StockPage() {
             />
           }
         >
-          <table className="mp-perm-table">
-            <caption className="mp-visually-hidden">Stok hareket geçmişi</caption>
-            <thead>
-              <tr>
-                <th scope="col">Tarih</th>
-                <th scope="col">Sebep</th>
-                <th scope="col">Değişim</th>
-                <th scope="col">Sonraki Bakiye</th>
-                <th scope="col">Emir</th>
-                <th scope="col">Kullanıcı</th>
-                <th scope="col">Not</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(history.data?.rows ?? []).map((m) => (
-                <tr key={m.id}>
-                  <td>{formatDateTime(m.createdAt)}</td>
-                  <td>{STOCK_REASON_LABEL[m.reason] ?? m.reason}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <ObjectStatus state={m.delta >= 0 ? 'Positive' : 'Negative'}>
-                      {`${m.delta > 0 ? '+' : ''}${formatNumber(m.delta, 2)}`}
-                    </ObjectStatus>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {formatNumber(m.balance, 2)} {m.chemical.unit}
-                  </td>
-                  <td>{m.order?.orderNo ?? '-'}</td>
-                  <td>{m.user?.fullName ?? '-'}</td>
-                  <td>{m.note ?? '-'}</td>
-                </tr>
-              ))}
-              {(history.data?.rows ?? []).length === 0 && (
+          <div className="mp-grid-scroll">
+            <table className="mp-grid mp-grid--zebra mp-grid--wrap">
+              <caption className="mp-visually-hidden">Stok hareket geçmişi</caption>
+              <thead>
                 <tr>
-                  <td colSpan={7} style={{ color: 'var(--sapContent_LabelColor)' }}>
-                    {history.isLoading ? 'Yükleniyor...' : 'Bu kimyasal için hareket kaydı yok.'}
-                  </td>
+                  <th scope="col">Tarih</th>
+                  <th scope="col">Sebep</th>
+                  <th scope="col">Değişim</th>
+                  <th scope="col">Sonraki Bakiye</th>
+                  <th scope="col">Emir</th>
+                  <th scope="col">Kullanıcı</th>
+                  <th scope="col">Not</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(history.data?.rows ?? []).map((m) => (
+                  <tr key={m.id}>
+                    <td>{formatDateTime(m.createdAt)}</td>
+                    <td>{STOCK_REASON_LABEL[m.reason] ?? m.reason}</td>
+                    <td className="mp-grid__num">
+                      <ObjectStatus state={m.delta >= 0 ? 'Positive' : 'Negative'}>
+                        {`${m.delta > 0 ? '+' : ''}${formatNumber(m.delta, 2)}`}
+                      </ObjectStatus>
+                    </td>
+                    <td className="mp-grid__num">
+                      {formatNumber(m.balance, 2)} {m.chemical.unit}
+                    </td>
+                    <td>{m.order?.orderNo ?? '-'}</td>
+                    <td>{m.user?.fullName ?? '-'}</td>
+                    <td>{m.note ?? '-'}</td>
+                  </tr>
+                ))}
+                {(history.data?.rows ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ color: 'var(--sapContent_LabelColor)' }}>
+                      {history.isLoading ? 'Yükleniyor...' : 'Bu kimyasal için hareket kaydı yok.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </Dialog>
       )}
     </div>

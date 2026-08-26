@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AnalyticalTable,
   Button,
   CheckBox,
   Form,
@@ -20,7 +19,8 @@ import { DataToolbar } from "../components/DataToolbar.js";
 import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
 import { downloadCsv, stampedFileName, type CsvColumn } from "../lib/csv.js";
-import { columns as tableColumns } from "../components/table.js";
+import { DataTable } from '../components/DataTable.js';
+import { actionColumn, columns as tableColumns } from "../components/table.js";
 import { FormDialog } from "../components/FormDialog.js";
 import type { Flange } from "../api/types.js";
 
@@ -143,11 +143,7 @@ export default function FlangePage() {
           ),
         },
         {
-          Header: "İşlem",
-          id: "actions",
-          width: 110,
-          disableFilters: true,
-          disableSortBy: true,
+          ...actionColumn(2),
           Cell: ({ row }: { row: { original: Flange } }) => (
             <div className="mp-inline-actions">
               {can("FLANS", "edit") && (
@@ -214,11 +210,10 @@ export default function FlangePage() {
       />
 
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={list.data ?? []}
           loading={list.isLoading}
-          visibleRows={14}
           filterable
           noDataText={
             list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı flanş bulunamadı."

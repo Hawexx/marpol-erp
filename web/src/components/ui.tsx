@@ -169,7 +169,7 @@ export function KpiTile({
   );
 }
 
-const STATUS_TONE: Record<OrderStatus, 'None' | 'Positive' | 'Critical' | 'Negative' | 'Information'> =
+export const STATUS_TONE: Record<OrderStatus, 'None' | 'Positive' | 'Critical' | 'Negative' | 'Information'> =
   {
     TASLAK: 'None',
     ONAY_BEKLIYOR: 'Critical',

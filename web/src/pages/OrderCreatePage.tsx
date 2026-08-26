@@ -478,92 +478,94 @@ export default function OrderCreatePage() {
           </MessageStrip>
         )}
 
-        <table className="mp-perm-table" style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th style={{ width: '40%' }}>Kimyasal</th>
-              <th style={{ width: '12%' }}>Kod</th>
-              <th style={{ width: '15%' }}>Oran (%)</th>
-              <th style={{ width: '15%' }}>Tahmini Miktar</th>
-              <th style={{ width: '13%' }}>Not</th>
-              <th style={{ width: '5%' }} />
-            </tr>
-          </thead>
-          <tbody>
-            {form.chemicals.map((row, index) => {
-              const chem = chemicalById.get(row.chemicalId);
-              // 1 adet ~ referans olarak 1 kg karisim varsayilir; miktar bilgilendirme amaclidir.
-              const amount = Number(form.quantity)
-                ? (Number(form.quantity) * (Number(row.ratio) || 0)) / 100
-                : null;
-              return (
-                <tr key={index}>
-                  <td>
-                    <UiSelect
-                      style={{ width: '100%' }}
-                      value={row.chemicalId}
-                      placeholder="Seçiniz"
-                      options={(chemicals.list.data ?? []).map((c) => ({
-                        value: c.id,
-                        label: c.name,
-                      }))}
-                      onSelect={(id) =>
-                        updateChemicals((rows) =>
-                          rows.map((c, i) => (i === index ? { ...c, chemicalId: id } : c)),
-                        )
-                      }
-                    />
-                  </td>
-                  <td>{chem?.code ?? '-'}</td>
-                  <td>
-                    <Input
-                      type="Number"
-                      style={{ width: '100%' }}
-                      value={String(row.ratio ?? 0)}
-                      onInput={(e) =>
-                        updateChemicals((rows) =>
-                          rows.map((c, i) =>
-                            i === index ? { ...c, ratio: Number(e.target.value) } : c,
-                          ),
-                        )
-                      }
-                    />
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {amount === null ? '-' : `${formatNumber(amount, 2)} ${chem?.unit ?? 'kg'}`}
-                  </td>
-                  <td>
-                    <Input
-                      style={{ width: '100%' }}
-                      value={row.notes ?? ''}
-                      onInput={(e) =>
-                        updateChemicals((rows) =>
-                          rows.map((c, i) => (i === index ? { ...c, notes: e.target.value } : c)),
-                        )
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Button
-                      design="Transparent"
-                      icon="decline"
-                      onClick={() =>
-                        updateChemicals((rows) => rows.filter((_, i) => i !== index))
-                      }
-                    />
+        <div className="mp-grid-scroll" style={{ marginTop: '0.75rem' }}>
+          <table className="mp-grid mp-grid--editable">
+            <thead>
+              <tr>
+                <th style={{ width: '40%' }}>Kimyasal</th>
+                <th style={{ width: '12%' }}>Kod</th>
+                <th style={{ width: '15%' }}>Oran (%)</th>
+                <th style={{ width: '15%' }}>Tahmini Miktar</th>
+                <th style={{ width: '13%' }}>Not</th>
+                <th style={{ width: '5%' }} />
+              </tr>
+            </thead>
+            <tbody>
+              {form.chemicals.map((row, index) => {
+                const chem = chemicalById.get(row.chemicalId);
+                // 1 adet ~ referans olarak 1 kg karisim varsayilir; miktar bilgilendirme amaclidir.
+                const amount = Number(form.quantity)
+                  ? (Number(form.quantity) * (Number(row.ratio) || 0)) / 100
+                  : null;
+                return (
+                  <tr key={index}>
+                    <td>
+                      <UiSelect
+                        style={{ width: '100%' }}
+                        value={row.chemicalId}
+                        placeholder="Seçiniz"
+                        options={(chemicals.list.data ?? []).map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                        }))}
+                        onSelect={(id) =>
+                          updateChemicals((rows) =>
+                            rows.map((c, i) => (i === index ? { ...c, chemicalId: id } : c)),
+                          )
+                        }
+                      />
+                    </td>
+                    <td>{chem?.code ?? '-'}</td>
+                    <td>
+                      <Input
+                        type="Number"
+                        style={{ width: '100%' }}
+                        value={String(row.ratio ?? 0)}
+                        onInput={(e) =>
+                          updateChemicals((rows) =>
+                            rows.map((c, i) =>
+                              i === index ? { ...c, ratio: Number(e.target.value) } : c,
+                            ),
+                          )
+                        }
+                      />
+                    </td>
+                    <td className="mp-grid__num">
+                      {amount === null ? '-' : `${formatNumber(amount, 2)} ${chem?.unit ?? 'kg'}`}
+                    </td>
+                    <td>
+                      <Input
+                        style={{ width: '100%' }}
+                        value={row.notes ?? ''}
+                        onInput={(e) =>
+                          updateChemicals((rows) =>
+                            rows.map((c, i) => (i === index ? { ...c, notes: e.target.value } : c)),
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <Button
+                        design="Transparent"
+                        icon="decline"
+                        onClick={() =>
+                          updateChemicals((rows) => rows.filter((_, i) => i !== index))
+                        }
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+              {form.chemicals.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ color: 'var(--sapContent_LabelColor)' }}>
+                    Reçete seçin veya elle kimyasal ekleyin.
                   </td>
                 </tr>
-              );
-            })}
-            {form.chemicals.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ color: 'var(--sapContent_LabelColor)' }}>
-                  Reçete seçin veya elle kimyasal ekleyin.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <div
           style={{

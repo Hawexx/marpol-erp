@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  AnalyticalTable,
   Bar,
   Button,
   CheckBox,
@@ -23,8 +22,13 @@ import { UiSelect } from '../components/UiSelect.js';
 import { useAuth } from '../auth/AuthContext.js';
 import { ListSection, PageHeader, formatNumber } from '../components/ui.js';
 import { DataToolbar } from '../components/DataToolbar.js';
-import { columns as tableColumns } from '../components/table.js';
+import { Pagination } from '../components/Pagination.js';
+import { DataTable } from '../components/DataTable.js';
+import { actionColumn, columns as tableColumns } from '../components/table.js';
+import { useDebounced } from '../lib/useDebounced.js';
 import type { Chemical, Fabric, FabricChemical } from '../api/types.js';
+
+const PAGE_SIZE = 50;
 
 type FabricForm = Omit<Fabric, 'id'> & { id?: string };
 type ChemicalForm = Omit<Chemical, 'id'> & { id?: string };
@@ -88,10 +92,18 @@ type CanFn = ReturnType<typeof useAuth>['can'];
 
 function FabricsTab({ canEdit }: { canEdit: CanFn }) {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState<FabricForm | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Fabric | null>(null);
 
-  const { list, save, remove } = useEntity<Fabric>('/fabrics', { search });
+  const debouncedSearch = useDebounced(search, 300);
+  const { list, save, remove, total } = useEntity<Fabric>('/fabrics', {
+    search: debouncedSearch,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+
+  useEffect(() => setPage(1), [debouncedSearch]);
   const chemicals = useEntity<Chemical>('/chemicals', { activeOnly: true });
 
   const columns = useMemo(
@@ -144,11 +156,7 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
         ),
       },
       {
-        Header: 'İşlem',
-        id: 'actions',
-        width: 110,
-        disableFilters: true,
-        disableSortBy: true,
+        ...actionColumn(2),
         Cell: ({ row }: { row: { original: Fabric } }) => (
           <div className="mp-inline-actions">
             {canEdit('KUMAS', 'edit') && (
@@ -207,17 +215,24 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
         onCreate={() => setForm({ ...EMPTY_FABRIC, chemicals: [] })}
         createLabel="Yeni Kumaş"
         canCreate={canEdit('KUMAS', 'create')}
-        count={list.data?.length}
+        count={total}
       />
 
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={list.data ?? []}
           loading={list.isLoading}
-          visibleRows={13}
           filterable
-          noDataText="Kayıtlı kumaş bulunamadı."
+          noDataText={list.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kumaş bulunamadı.'}
+        />
+
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={list.isFetching}
+          onChange={setPage}
         />
       </ListSection>
 
@@ -341,66 +356,68 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
                 </MessageStrip>
               )}
 
-              <table className="mp-perm-table">
-                <caption className="mp-visually-hidden">Kumaşa emdirilecek kimyasallar ve oranları</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" style={{ width: '55%' }}>Kimyasal</th>
-                    <th scope="col" style={{ width: '20%' }}>Oran (%)</th>
-                    <th scope="col" style={{ width: '20%' }}>Not</th>
-                    <th scope="col" style={{ width: '5%' }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.chemicals.map((row, index) => (
-                    <tr key={index}>
-                      <td>
-                        <UiSelect
-                          style={{ width: '100%' }}
-                          value={row.chemicalId}
-                          placeholder="Seçiniz"
-                          options={(chemicals.list.data ?? []).map((chem) => ({
-                            value: chem.id,
-                            label: `${chem.code} - ${chem.name}`,
-                          }))}
-                          onSelect={(chemicalId) => updateChemical(index, { chemicalId })}
-                        />
-                      </td>
-                      <td>
-                        <Input
-                          type="Number"
-                          style={{ width: '100%' }}
-                          value={String(row.ratio ?? 0)}
-                          onInput={(e) => updateChemical(index, { ratio: Number(e.target.value) })}
-                        />
-                      </td>
-                      <td>
-                        <Input
-                          style={{ width: '100%' }}
-                          value={row.notes ?? ''}
-                          onInput={(e) => updateChemical(index, { notes: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <Button
-                          design="Transparent"
-                          icon="decline"
-                          onClick={() =>
-                            update({ chemicals: form.chemicals.filter((_, i) => i !== index) })
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                  {form.chemicals.length === 0 && (
+              <div className="mp-grid-scroll">
+                <table className="mp-grid mp-grid--editable">
+                  <caption className="mp-visually-hidden">Kumaşa emdirilecek kimyasallar ve oranları</caption>
+                  <thead>
                     <tr>
-                      <td colSpan={4} style={{ color: 'var(--sapContent_LabelColor)' }}>
-                        Henüz kimyasal eklenmedi.
-                      </td>
+                      <th scope="col" style={{ width: '55%' }}>Kimyasal</th>
+                      <th scope="col" style={{ width: '20%' }}>Oran (%)</th>
+                      <th scope="col" style={{ width: '20%' }}>Not</th>
+                      <th scope="col" style={{ width: '5%' }} />
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {form.chemicals.map((row, index) => (
+                      <tr key={index}>
+                        <td>
+                          <UiSelect
+                            style={{ width: '100%' }}
+                            value={row.chemicalId}
+                            placeholder="Seçiniz"
+                            options={(chemicals.list.data ?? []).map((chem) => ({
+                              value: chem.id,
+                              label: `${chem.code} - ${chem.name}`,
+                            }))}
+                            onSelect={(chemicalId) => updateChemical(index, { chemicalId })}
+                          />
+                        </td>
+                        <td>
+                          <Input
+                            type="Number"
+                            style={{ width: '100%' }}
+                            value={String(row.ratio ?? 0)}
+                            onInput={(e) => updateChemical(index, { ratio: Number(e.target.value) })}
+                          />
+                        </td>
+                        <td>
+                          <Input
+                            style={{ width: '100%' }}
+                            value={row.notes ?? ''}
+                            onInput={(e) => updateChemical(index, { notes: e.target.value })}
+                          />
+                        </td>
+                        <td>
+                          <Button
+                            design="Transparent"
+                            icon="decline"
+                            onClick={() =>
+                              update({ chemicals: form.chemicals.filter((_, i) => i !== index) })
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {form.chemicals.length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ color: 'var(--sapContent_LabelColor)' }}>
+                          Henüz kimyasal eklenmedi.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
               <Button
                 icon="add"
@@ -454,10 +471,18 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
 
 function ChemicalsTab({ canEdit }: { canEdit: CanFn }) {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState<ChemicalForm | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Chemical | null>(null);
 
-  const { list, save, remove } = useEntity<Chemical>('/chemicals', { search });
+  const debouncedSearch = useDebounced(search, 300);
+  const { list, save, remove, total } = useEntity<Chemical>('/chemicals', {
+    search: debouncedSearch,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+
+  useEffect(() => setPage(1), [debouncedSearch]);
 
   const columns = useMemo(
     () => tableColumns<Chemical>([
@@ -485,11 +510,7 @@ function ChemicalsTab({ canEdit }: { canEdit: CanFn }) {
         ),
       },
       {
-        Header: 'İşlem',
-        id: 'actions',
-        width: 110,
-        disableFilters: true,
-        disableSortBy: true,
+        ...actionColumn(2),
         Cell: ({ row }: { row: { original: Chemical } }) => (
           <div className="mp-inline-actions">
             {canEdit('KUMAS', 'edit') && (
@@ -527,17 +548,24 @@ function ChemicalsTab({ canEdit }: { canEdit: CanFn }) {
         onCreate={() => setForm({ ...EMPTY_CHEMICAL })}
         createLabel="Yeni Kimyasal"
         canCreate={canEdit('KUMAS', 'create')}
-        count={list.data?.length}
+        count={total}
       />
 
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={list.data ?? []}
           loading={list.isLoading}
-          visibleRows={13}
           filterable
-          noDataText="Kayıtlı kimyasal bulunamadı."
+          noDataText={list.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kimyasal bulunamadı.'}
+        />
+
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          busy={list.isFetching}
+          onChange={setPage}
         />
       </ListSection>
 

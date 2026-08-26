@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AnalyticalTable,
   Button,
   CheckBox,
   Form,
@@ -19,7 +18,8 @@ import { ListSection, PageHeader, formatDateTime } from "../components/ui.js";
 import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
 import { DataToolbar } from "../components/DataToolbar.js";
-import { columns as tableColumns } from "../components/table.js";
+import { DataTable } from '../components/DataTable.js';
+import { actionColumn, columns as tableColumns } from "../components/table.js";
 import { FormDialog } from "../components/FormDialog.js";
 import { MODULES, MODULE_KEYS } from "../lib/modules.js";
 import type { AppUser, ModuleKey, PermissionRow } from "../api/types.js";
@@ -147,11 +147,7 @@ export default function UsersPage() {
           ),
         },
         {
-          Header: "İşlem",
-          id: "actions",
-          width: 110,
-          disableFilters: true,
-          disableSortBy: true,
+          ...actionColumn(2),
           Cell: ({ row }: { row: { original: AppUser } }) => (
             <div className="mp-inline-actions">
               {can("YETKILENDIRME", "edit") && (
@@ -256,11 +252,10 @@ export default function UsersPage() {
       />
 
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={list.data ?? []}
           loading={list.isLoading}
-          visibleRows={14}
           filterable
           noDataText={list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı personel bulunamadı."}
         />
@@ -404,81 +399,83 @@ export default function UsersPage() {
               </MessageStrip>
             )}
 
-            <table className="mp-perm-table" style={{ marginTop: "0.5rem" }}>
-              <caption className="mp-visually-hidden">
-                Kullanıcının sekme bazlı yetkileri
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col" style={{ width: "30%" }}>
-                    Sekme
-                  </th>
-                  {ACTION_COLUMNS.map((col) => (
-                    <th scope="col" key={col.key} title={col.hint}>
-                      {col.label}
+            <div className="mp-grid-scroll mp-grid-scroll--matrix" style={{ marginTop: "0.5rem" }}>
+              <table className="mp-grid mp-grid--matrix mp-grid--wrap">
+                <caption className="mp-visually-hidden">
+                  Kullanıcının sekme bazlı yetkileri
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: "30%" }}>
+                      Sekme
                     </th>
-                  ))}
-                  <th scope="col" style={{ width: "10%" }}>
-                    Tümü
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {MODULES.map(({ key: module, label, hint }) => {
-                  const row =
-                    form.permissions.find((p) => p.module === module) ??
-                    ({ module } as PermissionRow);
-                  const all = ACTION_COLUMNS.every((col) => row[col.key]);
-                  return (
-                    <tr key={module}>
-                      {/* Aciklama kayittan gelir; ayri bir sozluk tutulmaz. */}
-                      <td title={hint}>{label}</td>
-                      {ACTION_COLUMNS.map((col) => {
-                        // Onaylama yalnizca uretim emri sekmelerinde anlamli.
-                        const irrelevant =
-                          col.key === "canApprove" &&
-                          module !== "URETIM_EMIRLERI" &&
-                          module !== "URETIM_EMRI_OLUSTUR";
-                        return (
-                          <td key={col.key}>
-                            {irrelevant ? (
-                              <span
-                                style={{
-                                  color: "var(--sapContent_LabelColor)",
-                                }}
-                              >
-                                –
-                              </span>
-                            ) : (
-                              <CheckBox
-                                checked={Boolean(row[col.key])}
-                                disabled={form.isAdmin}
-                                onChange={(e) =>
-                                  togglePermission(
-                                    module,
-                                    col.key,
-                                    e.target.checked,
-                                  )
-                                }
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td>
-                        <CheckBox
-                          checked={all}
-                          disabled={form.isAdmin}
-                          onChange={(e) =>
-                            toggleModuleAll(module, e.target.checked)
-                          }
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    {ACTION_COLUMNS.map((col) => (
+                      <th scope="col" key={col.key} title={col.hint}>
+                        {col.label}
+                      </th>
+                    ))}
+                    <th scope="col" style={{ width: "10%" }}>
+                      Tümü
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MODULES.map(({ key: module, label, hint }) => {
+                    const row =
+                      form.permissions.find((p) => p.module === module) ??
+                      ({ module } as PermissionRow);
+                    const all = ACTION_COLUMNS.every((col) => row[col.key]);
+                    return (
+                      <tr key={module}>
+                        {/* Aciklama kayittan gelir; ayri bir sozluk tutulmaz. */}
+                        <th scope="row" title={hint}>{label}</th>
+                        {ACTION_COLUMNS.map((col) => {
+                          // Onaylama yalnizca uretim emri sekmelerinde anlamli.
+                          const irrelevant =
+                            col.key === "canApprove" &&
+                            module !== "URETIM_EMIRLERI" &&
+                            module !== "URETIM_EMRI_OLUSTUR";
+                          return (
+                            <td key={col.key}>
+                              {irrelevant ? (
+                                <span
+                                  style={{
+                                    color: "var(--sapContent_LabelColor)",
+                                  }}
+                                >
+                                  –
+                                </span>
+                              ) : (
+                                <CheckBox
+                                  checked={Boolean(row[col.key])}
+                                  disabled={form.isAdmin}
+                                  onChange={(e) =>
+                                    togglePermission(
+                                      module,
+                                      col.key,
+                                      e.target.checked,
+                                    )
+                                  }
+                                />
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td>
+                          <CheckBox
+                            checked={all}
+                            disabled={form.isAdmin}
+                            onChange={(e) =>
+                              toggleModuleAll(module, e.target.checked)
+                            }
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </FormDialog>
       )}

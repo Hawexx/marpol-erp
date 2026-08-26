@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AnalyticalTable,
   Bar,
   Button,
   Dialog,
@@ -12,7 +11,8 @@ import {
 import { api } from '../api/client.js';
 import { Pagination } from '../components/Pagination.js';
 import { UiSelect } from '../components/UiSelect.js';
-import { columns as tableColumns } from '../components/table.js';
+import { DataTable } from '../components/DataTable.js';
+import { actionColumn, columns as tableColumns } from '../components/table.js';
 import {
   AUDIT_ACTION_LABEL,
   AUDIT_ENTITY_LABEL,
@@ -130,11 +130,7 @@ export default function AuditPage() {
         },
         { Header: 'IP', accessor: 'ip', width: 130 },
         {
-          Header: '',
-          id: 'actions',
-          width: 90,
-          disableFilters: true,
-          disableSortBy: true,
+          ...actionColumn(1, { Header: '' }),
           Cell: ({ row }: { row: { original: AuditLog } }) => (
             <Button
               design="Transparent"
@@ -254,11 +250,10 @@ export default function AuditPage() {
       </Section>
 
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={logs.data?.rows ?? []}
           loading={logs.isLoading}
-          visibleRows={15}
           noDataText={
             logs.isError ? 'Kayıtlar yüklenemedi.' : 'Bu filtrelerle denetim kaydı bulunamadı.'
           }

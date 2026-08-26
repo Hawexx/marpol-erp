@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AnalyticalTable,
   Button,
   MessageStrip,
   ObjectStatus,
@@ -10,6 +9,7 @@ import {
   Text,
 } from '@ui5/webcomponents-react';
 import { api, errorMessage } from '../api/client.js';
+import { DataTable } from '../components/DataTable.js';
 import { columns as tableColumns } from '../components/table.js';
 import {
   KpiTile,
@@ -319,11 +319,10 @@ function MachineLoad({
         sabit süre sayılır.
       </MessageStrip>
       <ListSection title="Makine Yükü">
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={rows}
           loading={loading}
-          visibleRows={12}
           noDataText={
             isError ? 'Makine yükü yüklenemedi.' : 'Aktif makine veya bekleyen iş bulunamadı.'
           }
@@ -460,11 +459,10 @@ function Schedule({
         </MessageStrip>
       )}
       <ListSection title="Termin Takvimi">
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={rows}
           loading={loading}
-          visibleRows={12}
           noDataText={isError ? 'Takvim yüklenemedi.' : 'Planlanacak açık emir bulunamadı.'}
         />
       </ListSection>

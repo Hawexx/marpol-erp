@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AnalyticalTable,
   Bar,
   Button,
-  CheckBox,
   DatePicker,
   Dialog,
   Input,
@@ -24,7 +22,8 @@ import { Pagination } from '../components/Pagination.js';
 import { useEntity } from '../api/useEntity.js';
 import { useDebounced } from '../lib/useDebounced.js';
 import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
-import { columns as tableColumns } from '../components/table.js';
+import { DataTable } from '../components/DataTable.js';
+import { actionColumn, columns as tableColumns } from '../components/table.js';
 import { downloadOrderPdf } from '../pdf/orderPdf.js';
 import {
   Field,
@@ -35,6 +34,7 @@ import {
   PageHeader,
   PriorityBadge,
   STATUS_LABEL,
+  STATUS_TONE,
   STEP_LABEL,
   Section,
   StatusBadge,
@@ -99,6 +99,10 @@ const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
   TAMAMLANDI: [],
   IPTAL: [],
 };
+
+/* Rozetlerle ayni haritadan beslenir; iki yerde iki farkli renk olmaz. */
+const orderHighlight = (row: Record<string, unknown>) =>
+  STATUS_TONE[row.status as OrderStatus] ?? 'None';
 
 export default function OrderListPage() {
   const { can } = useAuth();
@@ -354,32 +358,15 @@ export default function OrderListPage() {
     [toast, showError],
   );
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  /* Native secim, satirlari `getRowId` ile gercek emir kimligine bagladigimiz
+     icin dogrudan id -> boolean haritasi olarak gelir. */
+  const selectedRowIds = useMemo(
+    () => Object.fromEntries([...selected].map((id) => [id, true])),
+    [selected],
+  );
 
   const columns = useMemo(
     () => tableColumns<ProductionOrder>([
-      {
-        Header: '',
-        id: 'select',
-        width: 44,
-        disableFilters: true,
-        disableSortBy: true,
-        Cell: ({ row }: { row: { original: ProductionOrder } }) => (
-          <CheckBox
-            checked={selected.has(row.original.id)}
-            onChange={() => toggleSelect(row.original.id)}
-            // Satir tiklamasi detay penceresini aciyor; secim onu tetiklemesin.
-            onClick={(e) => e.stopPropagation()}
-          />
-        ),
-      },
       { Header: 'Emir No', accessor: 'orderNo', width: 150 },
       {
         Header: 'Durum',
@@ -448,11 +435,7 @@ export default function OrderListPage() {
         },
       },
       {
-        Header: 'Detay',
-        id: 'actions',
-        width: 100,
-        disableFilters: true,
-        disableSortBy: true,
+        ...actionColumn(1, { Header: 'Detay' }),
         Cell: ({ row }: { row: { original: ProductionOrder } }) => (
           <Button
             design="Transparent"
@@ -463,11 +446,10 @@ export default function OrderListPage() {
         ),
       },
     ]),
-    [selected, toggleSelect],
+    [],
   );
 
   const s = summary.data;
-  const allOnPageSelected = rows.length > 0 && rows.every((o) => selected.has(o.id));
 
   return (
     <div className="mp-page mp-page--wide">
@@ -644,29 +626,31 @@ export default function OrderListPage() {
         </MessageStrip>
       )}
 
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.25rem' }}>
-        <CheckBox
-          text="Sayfadakilerin tümünü seç"
-          checked={allOnPageSelected}
-          disabled={rows.length === 0}
-          onChange={(e) =>
-            setSelected((prev) => {
-              const next = new Set(prev);
-              // Secim yalnizca bu sayfayi etkiler; diger sayfalardaki secim korunur.
-              rows.forEach((o) => (e.target.checked ? next.add(o.id) : next.delete(o.id)));
-              return next;
-            })
-          }
-        />
-      </div>
-
       <ListSection>
-        <AnalyticalTable
+        <DataTable
           columns={columns}
           data={rows}
           loading={orders.isLoading}
-          visibleRows={13}
           filterable
+          /* RowSelector: secim YALNIZCA onay kutusu sutunundan yapilir, boylece
+             satira tiklamak detay penceresini acmaya devam eder. */
+          /* Satir basinda durum rengi seridi. `highlightField` fonksiyon olarak
+             verildiginde MEMOIZE edilmis olmali - modul kapsaminda sabit. */
+          withRowHighlight
+          highlightField={orderHighlight}
+          selectionMode="Multiple"
+          selectionBehavior="RowSelector"
+          selectedRowIds={selectedRowIds}
+          /* Varsayilanda react-table satir kimligi olarak dizi indisini kullanir;
+             sayfa degisince veya siralama yapilinca secim yanlis satirlara
+             kayar. Gercek emir kimligine baglaniyor. */
+          reactTableOptions={{
+            getRowId: (row: ProductionOrder) => row.id,
+          }}
+          onRowSelect={(e) => {
+            const ids = e.detail.selectedRowIds ?? {};
+            setSelected(new Set(Object.keys(ids).filter((id) => ids[id])));
+          }}
           noDataText={
             orders.isError
               ? 'Kayıtlar yüklenemedi.'
@@ -683,7 +667,12 @@ export default function OrderListPage() {
           pageSize={PAGE_SIZE}
           total={total}
           busy={orders.isFetching}
-          onChange={setPage}
+          onChange={(next) => {
+            // Secim gorunen sayfayla sinirli: gorunmeyen satirlar toplu
+            // isleme dahil olup kazaya yol acmasin.
+            setSelected(new Set());
+            setPage(next);
+          }}
         />
       </ListSection>
 
@@ -971,22 +960,23 @@ function OrderDetail({
           Kimyasal Oranlaması
           {order.recipe ? ` (Reçete: ${order.recipe.code} - ${order.recipe.name})` : ''}
         </Title>
-        <table className="mp-perm-table" style={{ marginTop: '0.5rem' }}>
+        <div className="mp-grid-scroll" style={{ marginTop: '0.5rem' }}>
+        <table className="mp-grid mp-grid--zebra mp-grid--wrap">
           <thead>
             <tr>
-              <th style={{ width: '18%' }}>Kimyasal Kodu</th>
-              <th style={{ width: '42%' }}>Kimyasal Adı</th>
-              <th style={{ width: '15%' }}>Oran (%)</th>
-              <th style={{ width: '25%' }}>Not</th>
+              <th scope="col" style={{ width: '18%' }}>Kimyasal Kodu</th>
+              <th scope="col" style={{ width: '42%' }}>Kimyasal Adı</th>
+              <th scope="col" style={{ width: '15%' }}>Oran (%)</th>
+              <th scope="col" style={{ width: '25%' }}>Not</th>
             </tr>
           </thead>
           <tbody>
             {order.chemicals.map((row) => (
               <tr key={row.chemicalId}>
                 <td>{row.chemical?.code ?? '-'}</td>
-                <td style={{ textAlign: 'left' }}>{row.chemical?.name ?? '-'}</td>
+                <td>{row.chemical?.name ?? '-'}</td>
                 <td>%{formatNumber(row.ratio, 2)}</td>
-                <td style={{ textAlign: 'left' }}>{row.notes ?? '-'}</td>
+                <td>{row.notes ?? '-'}</td>
               </tr>
             ))}
             {order.chemicals.length === 0 && (
@@ -996,6 +986,7 @@ function OrderDetail({
             )}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section>
@@ -1008,25 +999,26 @@ function OrderDetail({
             Bu emre bir proses şeması bağlanmamış.
           </div>
         ) : (
-          <table className="mp-perm-table" style={{ marginTop: '0.5rem' }}>
+          <div className="mp-grid-scroll" style={{ marginTop: '0.5rem' }}>
+          <table className="mp-grid mp-grid--zebra mp-grid--wrap">
             <thead>
               <tr>
-                <th style={{ width: '4%' }}>#</th>
-                <th style={{ width: '24%' }}>Adım</th>
-                <th style={{ width: '14%' }}>Tip</th>
-                <th style={{ width: '16%' }}>Makine</th>
-                <th style={{ width: '10%' }}>Durum</th>
-                <th style={{ width: '8%' }}>Sağlam</th>
-                <th style={{ width: '8%' }}>Fire</th>
-                <th style={{ width: '12%' }}>Operatör</th>
-                <th style={{ width: '18%' }}>İşlem</th>
+                <th scope="col" style={{ width: '4%' }}>#</th>
+                <th scope="col" style={{ width: '22%' }}>Adım</th>
+                <th scope="col" style={{ width: '10%' }}>Tip</th>
+                <th scope="col" style={{ width: '14%' }}>Makine</th>
+                <th scope="col" style={{ width: '10%' }}>Durum</th>
+                <th scope="col" style={{ width: '7%' }}>Sağlam</th>
+                <th scope="col" style={{ width: '7%' }}>Fire</th>
+                <th scope="col" style={{ width: '10%' }}>Operatör</th>
+                <th scope="col" style={{ width: '16%' }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
               {steps.map((step, index) => (
                 <tr key={step.id}>
                   <td>{index + 1}</td>
-                  <td style={{ textAlign: 'left' }}>{step.node.label}</td>
+                  <td>{step.node.label}</td>
                   <td>{NODE_TYPE_LABEL[step.node.type]}</td>
                   <td>{step.node.machine?.name ?? '-'}</td>
                   <td>
@@ -1044,12 +1036,12 @@ function OrderDetail({
                       {STEP_LABEL[step.status]}
                     </ObjectStatus>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="mp-grid__num">
                     {step.okQty === null || step.okQty === undefined
                       ? '-'
                       : formatNumber(step.okQty)}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="mp-grid__num">
                     {step.scrapQty === null || step.scrapQty === undefined
                       ? '-'
                       : formatNumber(step.scrapQty)}
@@ -1120,6 +1112,7 @@ function OrderDetail({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 

@@ -478,30 +478,133 @@ ui5-multi-input {
   gap: 0.25rem;
 }
 
-/* Yetki matrisi tablosu */
-.mp-perm-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+/* ==========================================================================
+   .mp-grid - el yazimi tablolar
+   ==========================================================================
+
+   Onceki .mp-perm-table'in `display: block` kurali vardi. Bir <table>'a
+   display:block verildiginde tablo kutusu olmaktan cikar: `table-layout` ve
+   yuzdelik sutun genislikleri ARTIK UYGULANMAZ. Bu yuzden kullanim
+   yerlerindeki width:%55 / %20 / %5 gibi degerlerin hicbiri ise yaramiyor,
+   hucreler sarmiyor ve tablo yatay kaymaya zorlaniyordu.
+
+   Cozum: kaydirma islerini saran bir div'e verilir, tablo tablo olarak kalir. */
+.mp-grid-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.mp-perm-table th,
-.mp-perm-table td {
-  border: 1px solid var(--sapList_BorderColor, #e5e5e5);
-  padding: 0.375rem 0.5rem;
+.mp-grid {
+  width: 100%;
+  table-layout: fixed;
+  /* `separate` ZORUNLU: border-collapse:collapse ile position:sticky birlikte
+     kullanildiginda Chrome ve Safari yapiskan hucrelerin kenarligini
+     cizmiyor - matris modunda basliklar cizgisiz kaliyor. */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--mp-font-size-sm);
+}
+
+.mp-grid th,
+.mp-grid td {
+  padding: var(--mp-pad-cell);
+  /* Varsayilan `center` idi; yedi kullanimin altisinda yanlisti. */
+  text-align: start;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--sapList_BorderColor, #e5e5e5);
+  overflow-wrap: break-word;
+}
+
+.mp-grid thead th {
+  background: var(--sapList_HeaderBackground, #f2f2f2);
+  font-weight: var(--mp-font-weight-medium);
+  white-space: nowrap;
+}
+
+.mp-grid tbody tr:last-child > * {
+  border-bottom: none;
+}
+
+/* Satir basligi (ilk sutun) vurgulu olur. */
+.mp-grid th[scope='row'] {
+  font-weight: var(--mp-font-weight-medium);
+}
+
+/* --- Degistiriciler ------------------------------------------------------- */
+
+.mp-grid--zebra tbody tr:nth-child(even) > * {
+  background: var(--sapList_AlternatingBackground, transparent);
+}
+
+.mp-grid--hover tbody tr:hover > * {
+  background: var(--sapList_Hover_Background, transparent);
+}
+
+/* Icinde form kontrolu olan tablolar: acilir listeler kirpilmamali. */
+.mp-grid--editable td {
+  height: 3rem;
+  overflow: visible;
+}
+
+.mp-grid--editable .mp-grid-scroll,
+.mp-grid-scroll:has(.mp-grid--editable) {
+  overflow: visible;
+}
+
+/* Sayilar hizali okunsun. */
+.mp-grid__num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-grid__actions {
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* Uzun metin sarabilsin (varsayilan basliklarda nowrap). */
+.mp-grid--wrap thead th {
+  white-space: normal;
+}
+
+/* --- Matris: yapiskan baslik + yapiskan ilk sutun ------------------------- */
+.mp-grid--matrix th,
+.mp-grid--matrix td {
+  border-inline-end: 1px solid var(--sapList_BorderColor, #e5e5e5);
+}
+
+.mp-grid--matrix th:last-child,
+.mp-grid--matrix td:last-child {
+  border-inline-end: none;
+}
+
+/* Onay kutusu sutunlari ortalanir; ilk sutun (etiket) basta kalir. */
+.mp-grid--matrix tbody td:not(:first-child),
+.mp-grid--matrix thead th:not(:first-child) {
   text-align: center;
 }
 
-.mp-perm-table th:first-child,
-.mp-perm-table td:first-child {
-  text-align: left;
-  font-weight: 600;
+.mp-grid-scroll--matrix {
+  max-height: 26rem;
+  overflow: auto;
 }
 
-.mp-perm-table thead th {
-  background: var(--sapList_HeaderBackground, #f2f2f2);
-  font-weight: 600;
-  white-space: nowrap;
+.mp-grid--matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.mp-grid--matrix th[scope='row'] {
+  position: sticky;
+  inset-inline-start: 0;
+  background: var(--sapList_Background, #fff);
+  z-index: 1;
+}
+
+.mp-grid--matrix thead th:first-child {
+  inset-inline-start: 0;
+  z-index: 3;
 }
 
 /* Giris ekrani tanitim videosu */
@@ -774,13 +877,8 @@ ui5-multi-input {
   touch-action: none;
 }
 
-/* Genis tablolar ve izin matrisi kendi icinde yatay kaysin;
-   sayfa govdesi asla yatay kaymamali */
-.mp-perm-table {
-  display: block;
-  overflow-x: auto;
-  white-space: nowrap;
-}
+/* Yatay kaydirma artik tablonun kendisinde degil onu saran
+   .mp-grid-scroll div'inde; tablo tablo olarak kaliyor. */
 
 /* Tablet ve alti */
 @media (max-width: 1024px) {
