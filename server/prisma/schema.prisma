@@ -1,0 +1,528 @@
+// Marpol Üretim Yönetim Sistemi - Veritabanı Şeması
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// YETKİLENDİRME / KULLANICI YÖNETİMİ
+// ---------------------------------------------------------------------------
+
+/// Sistemdeki sekmeler (modül anahtarları). Yetkiler bu anahtarlar üzerinden verilir.
+enum ModuleKey {
+  URETIM_EMRI_OLUSTUR // Üretim emri oluşturma
+  FLANS               // Flanş çeşitleri
+  KUMAS               // Kumaş çeşitleri
+  KIMYASAL_RECETE     // Kimyasal reçete
+  IS_AKISI            // İş akışı ve üretim proses şemaları
+  URETIM_EMIRLERI     // Üretim emirlerinin düştüğü sekme
+  YETKILENDIRME       // Yetkilendirme paneli
+  DENETIM             // Denetim kaydı (audit log) görüntüleme
+  STOK                // Kimyasal stok takibi
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String
+  fullName     String
+  /// Personel sicil no
+  employeeNo   String?   @unique
+  department   String?
+  title        String?
+  email        String?
+  phone        String?
+  isAdmin      Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  /// Oturum sürümü. Şifre değişiminde artırılır; token içindeki değerle
+  /// eşleşmeyen eski oturumlar anında geçersiz olur.
+  tokenVersion     Int       @default(0)
+  /// Ard arda başarısız giriş sayacı (kaba kuvvet koruması).
+  failedLoginCount Int       @default(0)
+  /// Bu tarihe kadar giriş denemeleri reddedilir.
+  lockedUntil      DateTime?
+
+  permissions    Permission[]
+  createdOrders  ProductionOrder[] @relation("OrderCreatedBy")
+  approvedOrders ProductionOrder[] @relation("OrderApprovedBy")
+  stepLogs       OrderStepLog[]
+  auditLogs      AuditLog[]
+  stockMovements StockMovement[]
+
+  @@index([isActive])
+  @@map("users")
+}
+
+/// Kullanıcı başına, sekme başına yetki satırı.
+model Permission {
+  id         String    @id @default(uuid())
+  userId     String
+  module     ModuleKey
+  canView    Boolean   @default(false)
+  canCreate  Boolean   @default(false)
+  canEdit    Boolean   @default(false)
+  canDelete  Boolean   @default(false)
+  /// Üretim emri onaylama gibi özel işlemler
+  canApprove Boolean   @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, module])
+  @@map("permissions")
+}
+
+// ---------------------------------------------------------------------------
+// TANIM KARTLARI: FLANŞ / KUMAŞ / KİMYASAL
+// ---------------------------------------------------------------------------
+
+model Flange {
+  id            String   @id @default(uuid())
+  /// Flanş kodu - ör. FL-001
+  code          String   @unique
+  name          String
+  /// Malzeme: Plastik, Alüminyum, Sac vb.
+  material      String?
+  /// Flanş dış çapı (mm)
+  outerDiameter Float?
+  /// Flanş iç çapı (mm)
+  innerDiameter Float?
+  /// Mil / bağlantı delik çapı (mm)
+  boreDiameter  Float?
+  /// Kalınlık (mm)
+  thickness     Float?
+  /// Vida deliği sayısı
+  holeCount     Int?
+  /// Ağırlık (gr)
+  weight        Float?
+  supplier      String?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  productionOrders ProductionOrder[]
+
+  @@index([isActive])
+  @@map("flanges")
+}
+
+model Fabric {
+  id          String   @id @default(uuid())
+  /// Kumaş kodu - ör. KM-001
+  code        String   @unique
+  name        String
+  /// Kumaş tipi: Keçe, Dokuma, Nonwoven, Sisal vb.
+  type        String?
+  composition String?
+  /// Gramaj (g/m2)
+  gramaj      Float?
+  /// En (mm)
+  width       Float?
+  /// Kalınlık (mm)
+  thickness   Float?
+  color       String?
+  supplier    String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Bu kumaşa emdirilebilen kimyasallar ve varsayılan oranları
+  chemicals        FabricChemical[]
+  productionOrders ProductionOrder[]
+
+  @@index([isActive])
+  @@map("fabrics")
+}
+
+model Chemical {
+  id         String   @id @default(uuid())
+  /// Kimyasal kodu - ör. CH-001
+  code       String   @unique
+  name       String
+  /// Tip: Reçine, Sertleştirici, Çözücü, Aşındırıcı vb.
+  type       String?
+  /// Ölçü birimi: kg, lt, gr
+  unit       String   @default("kg")
+  density    Float?
+  supplier   String?
+  /// Güvenlik / tehlike notu (MSDS)
+  hazardNote String?
+  notes      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  /// Eldeki miktar (unit cinsinden). Hareketlerle güncellenir.
+  stockQty     Float @default(0)
+  /// Bu miktarın altına düşünce uyarı verilir. 0 = uyarı kapalı.
+  minStockQty  Float @default(0)
+
+  fabricLinks FabricChemical[]
+  recipeItems RecipeItem[]
+  orderItems  OrderChemical[]
+  movements   StockMovement[]
+
+  @@index([isActive])
+  @@map("chemicals")
+}
+
+/// Kumaş - Kimyasal ilişkisi: hangi kumaşa hangi kimyasal, varsayılan oran ile emdirilir.
+model FabricChemical {
+  id         String  @id @default(uuid())
+  fabricId   String
+  chemicalId String
+  /// Varsayılan oran (%)
+  ratio      Float   @default(0)
+  notes      String?
+
+  fabric   Fabric   @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+  chemical Chemical @relation(fields: [chemicalId], references: [id], onDelete: Cascade)
+
+  @@unique([fabricId, chemicalId])
+  @@map("fabric_chemicals")
+}
+
+// ---------------------------------------------------------------------------
+// KİMYASAL REÇETE
+// ---------------------------------------------------------------------------
+
+model Recipe {
+  id          String   @id @default(uuid())
+  /// Reçete kodu - ör. RC-001
+  code        String   @unique
+  name        String
+  description String?
+  version     Int      @default(1)
+  /// Referans karışım miktarı (kg)
+  batchSize   Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items            RecipeItem[]
+  productionOrders ProductionOrder[]
+
+  @@index([isActive])
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id         String  @id @default(uuid())
+  recipeId   String
+  chemicalId String
+  /// Karışım oranı (%)
+  ratio      Float
+  sortOrder  Int     @default(0)
+  notes      String?
+
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  chemical Chemical @relation(fields: [chemicalId], references: [id])
+
+  @@unique([recipeId, chemicalId])
+  @@map("recipe_items")
+}
+
+// ---------------------------------------------------------------------------
+// İŞ AKIŞI / ÜRETİM PROSES ŞEMALARI (n8n benzeri node-edge yapısı)
+// ---------------------------------------------------------------------------
+
+model Machine {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  /// Üretim hattı adı
+  line      String?
+  /// Saatlik kapasite (adet)
+  capacity  Float?
+  location  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nodes WorkflowNode[]
+
+  @@map("machines")
+}
+
+enum NodeType {
+  START     // Başlangıç
+  OPERATION // Operasyon / işlem
+  MACHINE   // Makine istasyonu
+  QUALITY   // Kalite kontrol
+  DECISION  // Karar (koşullu dallanma)
+  WAIT      // Bekleme / kurutma
+  END       // Bitiş
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  nodes            WorkflowNode[]
+  edges            WorkflowEdge[]
+  productionOrders ProductionOrder[]
+
+  @@index([isActive])
+  @@map("workflows")
+}
+
+model WorkflowNode {
+  id          String   @id @default(uuid())
+  workflowId  String
+  type        NodeType @default(OPERATION)
+  label       String
+  description String?
+  machineId   String?
+  /// Tahmini süre (dakika)
+  durationMin Float?
+  /// Sıcaklık (C) - emdirme / kurutma işlemleri için
+  temperature Float?
+  /// Serbest form ek ayarlar
+  config      Json?
+  posX        Float    @default(0)
+  posY        Float    @default(0)
+  sortOrder   Int      @default(0)
+
+  workflow Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  machine  Machine?       @relation(fields: [machineId], references: [id])
+  outgoing WorkflowEdge[] @relation("EdgeFrom")
+  incoming WorkflowEdge[] @relation("EdgeTo")
+  stepLogs OrderStepLog[]
+
+  @@index([workflowId])
+  @@map("workflow_nodes")
+}
+
+model WorkflowEdge {
+  id         String  @id @default(uuid())
+  workflowId String
+  fromNodeId String
+  toNodeId   String
+  label      String?
+  /// DECISION düğümleri için koşul ifadesi
+  condition  String?
+
+  workflow Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromNode WorkflowNode @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   WorkflowNode @relation("EdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([fromNodeId, toNodeId])
+  @@index([workflowId])
+  @@map("workflow_edges")
+}
+
+// ---------------------------------------------------------------------------
+// ÜRETİM EMRİ
+// ---------------------------------------------------------------------------
+
+enum Priority {
+  DUSUK
+  NORMAL
+  YUKSEK
+  KRITIK
+}
+
+enum OrderStatus {
+  TASLAK
+  ONAY_BEKLIYOR
+  PLANLANDI
+  URETIMDE
+  BEKLEMEDE
+  TAMAMLANDI
+  IPTAL
+}
+
+model ProductionOrder {
+  id      String @id @default(uuid())
+  /// Üretim emri no - ör. UE-2026-0001
+  orderNo String @unique
+
+  fabricId   String
+  flangeId   String
+  /// Kimyasal reçete (opsiyonel - satır bazlı oranlama da girilebilir)
+  recipeId   String?
+  /// Uygulanacak üretim proses şeması
+  workflowId String?
+
+  /// Disk fırçanın çapı (mm)
+  diskDiameter Float
+  /// Üretilecek adet
+  quantity     Int
+  /// Katman sayısı
+  layers       Int   @default(1)
+
+  priority Priority    @default(NORMAL)
+  deadline DateTime
+  status   OrderStatus @default(TASLAK)
+
+  plannedStart DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  /// Tamamlanan adet
+  producedQty  Int       @default(0)
+  scrapQty     Int       @default(0)
+
+  customer String?
+  notes    String?
+
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  fabric     Fabric    @relation(fields: [fabricId], references: [id])
+  flange     Flange    @relation(fields: [flangeId], references: [id])
+  recipe     Recipe?   @relation(fields: [recipeId], references: [id])
+  workflow   Workflow? @relation(fields: [workflowId], references: [id])
+  createdBy  User      @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  approvedBy User?     @relation("OrderApprovedBy", fields: [approvedById], references: [id])
+
+  chemicals OrderChemical[]
+  stepLogs  OrderStepLog[]
+  stockMoves StockMovement[]
+
+  @@index([status])
+  @@index([deadline])
+  @@index([priority])
+  @@map("production_orders")
+}
+
+/// Üretim emrine özel kimyasal oranlaması (reçeteden kopyalanır, üzerinde değişiklik yapılabilir).
+model OrderChemical {
+  id         String  @id @default(uuid())
+  orderId    String
+  chemicalId String
+  /// Oran (%)
+  ratio      Float
+  /// Hesaplanan miktar (kg)
+  amount     Float?
+  sortOrder  Int     @default(0)
+  notes      String?
+
+  order    ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  chemical Chemical        @relation(fields: [chemicalId], references: [id])
+
+  @@unique([orderId, chemicalId])
+  @@map("order_chemicals")
+}
+
+enum StepStatus {
+  BEKLIYOR
+  BASLADI
+  TAMAMLANDI
+  ATLANDI
+}
+
+/// Üretim emrinin proses şemasındaki her adımda ilerlemesi.
+model OrderStepLog {
+  id          String     @id @default(uuid())
+  orderId     String
+  nodeId      String
+  status      StepStatus @default(BEKLIYOR)
+  startedAt   DateTime?
+  completedAt DateTime?
+  operatorId  String?
+  okQty       Int?
+  scrapQty    Int?
+  notes       String?
+
+  order    ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  node     WorkflowNode    @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  /// Operatör silinse de adım kaydı korunur; yalnızca kişi bağı kopar.
+  operator User?           @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, nodeId])
+  @@index([orderId])
+  @@map("order_step_logs")
+}
+
+// ---------------------------------------------------------------------------
+// DENETİM KAYDI
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  /// CREATE / UPDATE / DELETE / LOGIN / STATUS_CHANGE
+  action    String
+  /// Flange / Fabric / ProductionOrder ...
+  entity    String
+  entityId  String?
+  detail    Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  /// Kullanıcı silindiğinde denetim kaydı korunur, yalnızca bağı kopar.
+  /// Aksi halde Restrict davranışı yüzünden giriş yapmış hiçbir kullanıcı
+  /// silinemiyordu (her giriş bir AuditLog satırı yazar).
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Yıl başına üretim emri sayacı. Emir numarası üretimindeki yarış
+/// durumunu önlemek için ayrı bir satırda tutulur (bkz. nextOrderNo).
+model OrderCounter {
+  year    Int @id
+  lastSeq Int @default(0)
+
+  @@map("order_counters")
+}
+
+// ---------------------------------------------------------------------------
+// STOK HAREKETLERİ
+// ---------------------------------------------------------------------------
+
+/// Stok hareketinin sebebi.
+enum StockReason {
+  GIRIS      // Mal kabul / satın alma
+  CIKIS      // Elle çıkış
+  URETIM     // Üretim emrinde tüketim
+  SAYIM      // Sayım düzeltmesi
+  IADE       // Tedarikçiye iade / üretimden dönüş
+}
+
+/// Kimyasal stok hareketi. Eldeki miktar Chemical.stockQty alanında tutulur;
+/// bu tablo değiştirilemez bir defter olarak geçmişi saklar.
+model StockMovement {
+  id         String      @id @default(uuid())
+  chemicalId String
+  reason     StockReason
+  /// Pozitif = giriş, negatif = çıkış. Hareket sonrası bakiye de saklanır
+  /// ki geçmiş, sonradan yapılan düzeltmelerden etkilenmesin.
+  delta      Float
+  balance    Float
+  /// Üretim tüketiminde ilgili emir.
+  orderId    String?
+  note       String?
+  userId     String?
+  createdAt  DateTime    @default(now())
+
+  chemical Chemical         @relation(fields: [chemicalId], references: [id], onDelete: Cascade)
+  order    ProductionOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user     User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([chemicalId, createdAt])
+  @@index([createdAt])
+  @@map("stock_movements")
+}

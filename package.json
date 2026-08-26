@@ -1,0 +1,25 @@
+{
+  "name": "marpol-ppm",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Marpol Uretim Yonetim Sistemi (Production Process Management)",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "prisma:generate": "npm run prisma:generate -w server",
+    "prisma:push": "npm run prisma:push -w server",
+    "seed": "npm run seed -w server",
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "dev": "concurrently -n API,WEB -c red,blue \"npm:dev:server\" \"npm:dev:web\"",
+    "build": "npm run build -w server && npm run build -w web",
+    "setup": "npm install && npm run db:up && npm run prisma:push && npm run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

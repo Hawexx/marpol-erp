@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 200" width="100%" height="100%">
+  <defs>
+    <style>
+      .marpol-red { fill: #E30613; }
+      .marpol-text { 
+        font-family: 'Arial Black', 'Impact', sans-serif; 
+        font-style: italic; 
+        font-weight: 900; 
+        font-size: 92px; 
+        letter-spacing: -3px; 
+      }
+      .white-outline {
+        stroke: #FFFFFF;
+        stroke-width: 14px;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+
+  <!-- Kırmızı Baklava (Elmas) -->
+  <g transform="translate(110, 100)">
+    <rect x="-64" y="-64" width="128" height="128" rx="6" transform="rotate(45)" class="marpol-red" />
+    
+    <!-- M Harfi (Sistem fontlarından bağımsız, hatasız vektörel path) -->
+    <path d="M -50,48 L -50,-48 L -17,-48 L 0,12 L 17,-48 L 50,-48 L 50,48 L 24,48 L 24,-19 L 0,38 L -24,-19 L -24,48 Z" fill="#FFFFFF" />
+  </g>
+
+  <!-- Kesme Efekti İçin Beyaz Dış Çizgili "arpol" -->
+  <!-- Bu katman 'a' harfinin kırmızı elması orantılı bir şekilde oymasını sağlar -->
+  <text x="175" y="134" class="marpol-text white-outline" fill="#FFFFFF">arpol</text>
+  
+  <!-- Kırmızı "arpol" Yazısı -->
+  <text x="175" y="134" class="marpol-text marpol-red">arpol</text>
+
+  <!-- Tescil Simgesi (®) -->
+  <g class="marpol-red" transform="translate(460, 52)">
+    <circle cx="0" cy="0" r="8" fill="none" stroke="#E30613" stroke-width="1.8"/>
+    <text x="-4.5" y="3.5" font-family="Arial, sans-serif" font-size="11" font-weight="bold">R</text>
+  </g>
+</svg>

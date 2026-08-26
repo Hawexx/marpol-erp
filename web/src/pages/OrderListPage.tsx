@@ -1,0 +1,1248 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  AnalyticalTable,
+  Bar,
+  Button,
+  CheckBox,
+  DatePicker,
+  Dialog,
+  Input,
+  Label,
+  MessageBox,
+  MessageStrip,
+  ObjectStatus,
+  Title,
+} from '@ui5/webcomponents-react';
+import { api, errorMessage } from '../api/client.js';
+import { useNotify } from '../components/NotificationProvider.js';
+import { useAuth } from '../auth/AuthContext.js';
+import { DataToolbar } from '../components/DataToolbar.js';
+import { UiSelect } from '../components/UiSelect.js';
+import { Pagination } from '../components/Pagination.js';
+import { useEntity } from '../api/useEntity.js';
+import { useDebounced } from '../lib/useDebounced.js';
+import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
+import { columns as tableColumns } from '../components/table.js';
+import { downloadOrderPdf } from '../pdf/orderPdf.js';
+import {
+  KpiTile,
+  NODE_TYPE_LABEL,
+  PRIORITY_LABEL,
+  PageHeader,
+  PriorityBadge,
+  STATUS_LABEL,
+  STEP_LABEL,
+  StatusBadge,
+  daysUntil,
+  formatDate,
+  formatDateTime,
+  formatNumber,
+  trToIsoDate,
+} from '../components/ui.js';
+import type {
+  Fabric,
+  OrderStatus,
+  OrderStepLog,
+  OrderSummary,
+  ProductionOrder,
+  StepStatus,
+} from '../api/types.js';
+
+/** Durum bazli izin verilen ilerleme aksiyonlari. */
+const ACTIONS: { status: OrderStatus; label: string; icon: string; design?: 'Emphasized' | 'Negative' }[] =
+  [
+    { status: 'PLANLANDI', label: 'Onayla / Planla', icon: 'accept', design: 'Emphasized' },
+    { status: 'URETIMDE', label: 'Üretimi Başlat', icon: 'play', design: 'Emphasized' },
+    { status: 'BEKLEMEDE', label: 'Beklemeye Al', icon: 'pause' },
+    { status: 'TAMAMLANDI', label: 'Tamamlandı', icon: 'complete', design: 'Emphasized' },
+    { status: 'IPTAL', label: 'İptal Et', icon: 'decline', design: 'Negative' },
+  ];
+
+/** Sunucuda canApprove yetkisi arayan gecisler (bkz. server/src/routes/orders.ts). */
+const APPROVAL_STATUSES: OrderStatus[] = ['PLANLANDI', 'TAMAMLANDI', 'IPTAL'];
+
+const PAGE_SIZE = 50;
+
+/** Disa aktarilan sutunlar. */
+const CSV_COLUMNS: CsvColumn<ProductionOrder>[] = [
+  { header: 'Emir No', value: (o) => o.orderNo },
+  { header: 'Durum', value: (o) => STATUS_LABEL[o.status] },
+  { header: 'Aciliyet', value: (o) => PRIORITY_LABEL[o.priority] },
+  { header: 'Müşteri', value: (o) => o.customer },
+  { header: 'Kumaş', value: (o) => `${o.fabric.code} - ${o.fabric.name}` },
+  { header: 'Flanş', value: (o) => `${o.flange.code} - ${o.flange.name}` },
+  { header: 'Disk Çapı (mm)', value: (o) => o.diskDiameter },
+  { header: 'Adet', value: (o) => o.quantity },
+  { header: 'Katman', value: (o) => o.layers },
+  { header: 'Üretilen', value: (o) => o.producedQty },
+  { header: 'Fire', value: (o) => o.scrapQty },
+  { header: 'Termin', value: (o) => formatDate(o.deadline) },
+  { header: 'Oluşturan', value: (o) => o.createdBy?.fullName },
+  { header: 'Onaylayan', value: (o) => o.approvedBy?.fullName },
+  {
+    header: 'Kimyasallar',
+    value: (o) => o.chemicals.map((c) => `${c.chemical?.code} %${c.ratio}`).join(' + '),
+  },
+];
+
+const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
+  TASLAK: ['ONAY_BEKLIYOR', 'IPTAL'],
+  ONAY_BEKLIYOR: ['PLANLANDI', 'IPTAL'],
+  PLANLANDI: ['URETIMDE', 'BEKLEMEDE', 'IPTAL'],
+  URETIMDE: ['BEKLEMEDE', 'TAMAMLANDI', 'IPTAL'],
+  BEKLEMEDE: ['URETIMDE', 'IPTAL'],
+  TAMAMLANDI: [],
+  IPTAL: [],
+};
+
+export default function OrderListPage() {
+  const { can } = useAuth();
+  const navigate = useNavigate();
+  const { toast, error: showError } = useNotify();
+  const queryClient = useQueryClient();
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | OrderStatus>('OPEN');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [fabricFilter, setFabricFilter] = useState('');
+  const [deadlineFrom, setDeadlineFrom] = useState('');
+  const [deadlineTo, setDeadlineTo] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [detail, setDetail] = useState<ProductionOrder | null>(null);
+  const [confirm, setConfirm] = useState<{ order: ProductionOrder; status: OrderStatus } | null>(
+    null,
+  );
+  const [producedQty, setProducedQty] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
+
+  // Her tus vurusunda tam sorgu atmamak icin arama gecikmeli uygulanir.
+  const debouncedSearch = useDebounced(search, 300);
+  const debouncedCustomer = useDebounced(customerFilter, 300);
+
+  const statusParam =
+    statusFilter === 'ALL'
+      ? ''
+      : statusFilter === 'OPEN'
+        ? 'TASLAK,ONAY_BEKLIYOR,PLANLANDI,URETIMDE,BEKLEMEDE'
+        : statusFilter;
+
+  const fabrics = useEntity<Fabric>('/fabrics', { activeOnly: true });
+
+  /** Filtreleri sorgu dizesine cevirir; disa aktarmada da kullanilir. */
+  const buildParams = useCallback(
+    (withPaging: boolean) => {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set('q', debouncedSearch);
+      if (statusParam) params.set('status', statusParam);
+      if (priorityFilter) params.set('priority', priorityFilter);
+      if (debouncedCustomer) params.set('customer', debouncedCustomer);
+      if (fabricFilter) params.set('fabricId', fabricFilter);
+      // DatePicker dd.MM.yyyy verir; sunucu ISO bekler. Gecersiz tarih
+      // filtreye hic eklenmez.
+      const fromIso = deadlineFrom ? trToIsoDate(deadlineFrom) : null;
+      const toIso = deadlineTo ? trToIsoDate(deadlineTo) : null;
+      if (fromIso) params.set('deadlineFrom', fromIso);
+      if (toIso) params.set('deadlineTo', toIso);
+      if (withPaging) {
+        params.set('page', String(page));
+        params.set('pageSize', String(PAGE_SIZE));
+      }
+      return params;
+    },
+    [
+      debouncedSearch,
+      statusParam,
+      priorityFilter,
+      debouncedCustomer,
+      fabricFilter,
+      deadlineFrom,
+      deadlineTo,
+      page,
+    ],
+  );
+
+  const listQuery = buildParams(true).toString();
+
+  const orders = useQuery({
+    queryKey: ['/orders', listQuery],
+    queryFn: () => api.get<{ rows: ProductionOrder[]; total: number }>(`/orders?${listQuery}`),
+  });
+
+  const rows = orders.data?.rows ?? [];
+  const total = orders.data?.total ?? 0;
+
+  // Filtre degisince ilk sayfaya don; aksi halde bos sayfada kalinabilir.
+  useEffect(() => {
+    setPage(1);
+    setSelected(new Set());
+  }, [debouncedSearch, statusParam, priorityFilter, debouncedCustomer, fabricFilter, deadlineFrom, deadlineTo]);
+
+  const summary = useQuery({
+    queryKey: ['/orders/summary'],
+    queryFn: () => api.get<OrderSummary>('/orders/summary'),
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['/orders'] });
+    queryClient.invalidateQueries({ queryKey: ['/orders/summary'] });
+  };
+
+  const changeStatus = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      qty,
+    }: {
+      id: string;
+      status: OrderStatus;
+      qty?: number;
+    }) =>
+      api.patch<ProductionOrder>(`/orders/${id}/status`, {
+        status,
+        ...(qty !== undefined ? { producedQty: qty } : {}),
+      }),
+    onSuccess: (order) => {
+      toast(`${order.orderNo} → ${STATUS_LABEL[order.status]}`);
+      setDetail((prev) => (prev && prev.id === order.id ? order : prev));
+      invalidate();
+    },
+    onError: (err) => showError(errorMessage(err)),
+  });
+
+  const updateStep = useMutation({
+    mutationFn: ({
+      orderId,
+      nodeId,
+      status,
+      okQty,
+      scrapQty,
+      notes,
+    }: {
+      orderId: string;
+      nodeId: string;
+      status: StepStatus;
+      okQty?: number | null;
+      scrapQty?: number | null;
+      notes?: string | null;
+    }) =>
+      api.patch(`/orders/${orderId}/steps/${nodeId}`, {
+        status,
+        ...(okQty !== undefined ? { okQty } : {}),
+        ...(scrapQty !== undefined ? { scrapQty } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+      }),
+    onSuccess: async (_result, variables) => {
+      toast('Proses adımı güncellendi.');
+      invalidate();
+      try {
+        const fresh = await api.get<ProductionOrder>(`/orders/${variables.orderId}`);
+        // Kullanici bu arada pencereyi kapattiysa yeniden acma; onceki surumde
+        // `setDetail(fresh)` kapali diyalogu geri aciyordu.
+        setDetail((prev) => (prev && prev.id === variables.orderId ? fresh : prev));
+      } catch (err) {
+        // onError yalnizca mutationFn hatalarini kapsar; bu istek ayri.
+        showError(errorMessage(err));
+      }
+    },
+    onError: (err) => showError(errorMessage(err)),
+  });
+
+  const removeOrder = useMutation({
+    mutationFn: (id: string) => api.delete(`/orders/${id}`),
+    onSuccess: () => {
+      toast('Üretim emri silindi.');
+      setDeleteTarget(null);
+      setDetail(null);
+      invalidate();
+    },
+    onError: (err) => showError(errorMessage(err)),
+  });
+
+  const [deleteTarget, setDeleteTarget] = useState<ProductionOrder | null>(null);
+
+  /** "Bitir" isleminde miktar girisi icin acilan form. */
+  const [stepForm, setStepForm] = useState<{
+    orderId: string;
+    nodeId: string;
+    label: string;
+    status: StepStatus;
+    okQty: string;
+    scrapQty: string;
+    notes: string;
+    maxQty: number;
+  } | null>(null);
+
+  const bulkStatus = useMutation({
+    mutationFn: ({ ids, status }: { ids: string[]; status: OrderStatus }) =>
+      api.patch<{ updated: number; skipped: { orderNo: string; reason: string }[] }>(
+        '/orders/bulk-status',
+        { ids, status },
+      ),
+    onSuccess: (result) => {
+      // Atlanan kayitlari sessizce yutmak, kullanicinin isini yapildi
+      // sanmasina yol acar; sebebiyle birlikte gosterilir.
+      if (result.skipped.length) {
+        showError(
+          `${result.updated} emir güncellendi. Atlananlar: ` +
+            result.skipped.map((s) => `${s.orderNo} (${s.reason})`).join(', '),
+        );
+      } else {
+        toast(`${result.updated} emir güncellendi.`);
+      }
+      setSelected(new Set());
+      setBulkTarget(null);
+      invalidate();
+    },
+    onError: (err) => showError(errorMessage(err)),
+  });
+
+  const [bulkTarget, setBulkTarget] = useState<OrderStatus | null>(null);
+
+  /**
+   * Disa aktarma sayfayla sinirli olmamali: mevcut filtrelerin TAMAMINI
+   * sunucudan cekip oyle yazar.
+   */
+  const exportCsv = useCallback(async () => {
+    setExportBusy(true);
+    try {
+      const params = buildParams(false);
+      params.set('page', '1');
+      params.set('pageSize', '500');
+
+      const all: ProductionOrder[] = [];
+      for (let p = 1; ; p++) {
+        params.set('page', String(p));
+        const res = await api.get<{ rows: ProductionOrder[]; total: number }>(`/orders?${params}`);
+        all.push(...res.rows);
+        if (all.length >= res.total || res.rows.length === 0) break;
+      }
+
+      downloadCsv(stampedFileName('uretim-emirleri'), all, CSV_COLUMNS);
+      toast(`${all.length} emir dışa aktarıldı.`);
+    } catch (err) {
+      showError(errorMessage(err));
+    } finally {
+      setExportBusy(false);
+    }
+  }, [buildParams, toast, showError]);
+
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+
+  /** Emri PDF olarak indirir; guncel veriyi sunucudan cekip basar. */
+  const downloadPdf = useCallback(
+    async (order: ProductionOrder) => {
+      setPdfBusy(order.id);
+      try {
+        // Liste yaniti tum ayrintilari icerse de, baski aninda en guncel hali alinir.
+        const fresh = await api.get<ProductionOrder>(`/orders/${order.id}`);
+        await downloadOrderPdf(fresh);
+        toast(`${fresh.orderNo} PDF olarak indirildi.`);
+      } catch (err) {
+        showError(errorMessage(err));
+      } finally {
+        setPdfBusy(null);
+      }
+    },
+    [toast, showError],
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const columns = useMemo(
+    () => tableColumns<ProductionOrder>([
+      {
+        Header: '',
+        id: 'select',
+        width: 44,
+        disableFilters: true,
+        disableSortBy: true,
+        Cell: ({ row }: { row: { original: ProductionOrder } }) => (
+          <CheckBox
+            checked={selected.has(row.original.id)}
+            onChange={() => toggleSelect(row.original.id)}
+            // Satir tiklamasi detay penceresini aciyor; secim onu tetiklemesin.
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+      },
+      { Header: 'Emir No', accessor: 'orderNo', width: 150 },
+      {
+        Header: 'Durum',
+        accessor: 'status',
+        width: 140,
+        Cell: ({ value }: { value: OrderStatus }) => <StatusBadge status={value} />,
+      },
+      {
+        Header: 'Aciliyet',
+        accessor: 'priority',
+        width: 110,
+        Cell: ({ row }: { row: { original: ProductionOrder } }) => (
+          <PriorityBadge priority={row.original.priority} />
+        ),
+      },
+      { Header: 'Müşteri', accessor: 'customer', width: 180 },
+      {
+        Header: 'Kumaş',
+        id: 'fabric',
+        width: 200,
+        Cell: ({ row }: { row: { original: ProductionOrder } }) =>
+          `${row.original.fabric.code} - ${row.original.fabric.name}`,
+      },
+      {
+        Header: 'Flanş',
+        id: 'flange',
+        width: 200,
+        Cell: ({ row }: { row: { original: ProductionOrder } }) =>
+          `${row.original.flange.code} - ${row.original.flange.name}`,
+      },
+      {
+        Header: 'Disk Çapı',
+        accessor: 'diskDiameter',
+        width: 110,
+        hAlign: 'End' as const,
+        Cell: ({ value }: { value: number }) => `${formatNumber(value, 1)} mm`,
+      },
+      {
+        Header: 'Adet',
+        accessor: 'quantity',
+        width: 100,
+        hAlign: 'End' as const,
+        Cell: ({ value }: { value: number }) => formatNumber(value),
+      },
+      { Header: 'Katman', accessor: 'layers', width: 90, hAlign: 'End' as const },
+      {
+        Header: 'Termin',
+        accessor: 'deadline',
+        width: 120,
+        Cell: ({ value }: { value: string }) => formatDate(value),
+      },
+      {
+        Header: 'Kalan Gün',
+        id: 'remaining',
+        width: 120,
+        disableFilters: true,
+        Cell: ({ row }: { row: { original: ProductionOrder } }) => {
+          const order = row.original;
+          if (order.status === 'TAMAMLANDI' || order.status === 'IPTAL') return '-';
+          const days = daysUntil(order.deadline);
+          return (
+            <ObjectStatus state={days < 0 ? 'Negative' : days <= 3 ? 'Critical' : 'Positive'}>
+              {days < 0 ? `${Math.abs(days)} gün gecikme` : `${days} gün`}
+            </ObjectStatus>
+          );
+        },
+      },
+      {
+        Header: 'Detay',
+        id: 'actions',
+        width: 100,
+        disableFilters: true,
+        disableSortBy: true,
+        Cell: ({ row }: { row: { original: ProductionOrder } }) => (
+          <Button
+            design="Transparent"
+            icon="detail-view"
+            tooltip="Detay"
+            onClick={() => setDetail(row.original)}
+          />
+        ),
+      },
+    ]),
+    [selected, toggleSelect],
+  );
+
+  const s = summary.data;
+  const allOnPageSelected = rows.length > 0 && rows.every((o) => selected.has(o.id));
+
+  return (
+    <div className="mp-page">
+      <PageHeader
+        title="Üretim Emirleri"
+        subtitle="Üretim hattına düşen emirler, durumları ve proses ilerlemeleri"
+      />
+
+      <div className="mp-kpis">
+        <KpiTile label="Toplam Emir" value={formatNumber(s?.total ?? 0)} tone="info" />
+        <KpiTile
+          label="Onay Bekleyen"
+          value={formatNumber(s?.byStatus.ONAY_BEKLIYOR ?? 0)}
+          tone="warning"
+        />
+        <KpiTile label="Üretimde" value={formatNumber(s?.byStatus.URETIMDE ?? 0)} tone="info" />
+        <KpiTile
+          label="Tamamlanan"
+          value={formatNumber(s?.byStatus.TAMAMLANDI ?? 0)}
+          tone="good"
+        />
+        <KpiTile label="Termini Geçen" value={formatNumber(s?.overdue ?? 0)} tone="critical" />
+        <KpiTile label="Kritik Aciliyet" value={formatNumber(s?.byPriority.KRITIK ?? 0)} tone="critical" />
+      </div>
+
+      <DataToolbar
+        search={search}
+        onSearchChange={setSearch}
+        onRefresh={() => {
+          orders.refetch();
+          summary.refetch();
+        }}
+        count={total}
+        onExport={exportCsv}
+        exportBusy={exportBusy}
+        extra={
+          <>
+            <Label showColon>Durum</Label>
+            <UiSelect
+              style={{ minWidth: '190px' }}
+              value={statusFilter}
+              options={[
+                { value: 'OPEN', label: 'Açık Emirler' },
+                { value: 'ALL', label: 'Tümü' },
+                ...(Object.keys(STATUS_LABEL) as OrderStatus[]).map((status) => ({
+                  value: status,
+                  label: STATUS_LABEL[status],
+                })),
+              ]}
+              onSelect={(v) => setStatusFilter(v as typeof statusFilter)}
+            />
+            <Button
+              design="Transparent"
+              icon="filter"
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              {filtersOpen ? 'Filtreleri Gizle' : 'Diğer Filtreler'}
+            </Button>
+          </>
+        }
+      />
+
+      {filtersOpen && (
+        <div className="mp-card" style={{ marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ minWidth: '180px' }}>
+              <Label showColon>Aciliyet</Label>
+              <UiSelect
+                style={{ width: '100%' }}
+                value={priorityFilter}
+                placeholder="(tümü)"
+                options={(Object.keys(PRIORITY_LABEL) as (keyof typeof PRIORITY_LABEL)[]).map(
+                  (p) => ({ value: p as string, label: PRIORITY_LABEL[p] }),
+                )}
+                onSelect={setPriorityFilter}
+              />
+            </div>
+            <div style={{ minWidth: '200px' }}>
+              <Label showColon>Müşteri</Label>
+              <Input
+                style={{ width: '100%' }}
+                placeholder="Müşteri adı"
+                value={customerFilter}
+                onInput={(e) => setCustomerFilter(e.target.value)}
+              />
+            </div>
+            <div style={{ minWidth: '220px' }}>
+              <Label showColon>Kumaş</Label>
+              <UiSelect
+                style={{ width: '100%' }}
+                value={fabricFilter}
+                placeholder="(tümü)"
+                options={(fabrics.list.data ?? []).map((f) => ({
+                  value: f.id,
+                  label: `${f.code} - ${f.name}`,
+                }))}
+                onSelect={setFabricFilter}
+              />
+            </div>
+            <div style={{ width: '160px' }}>
+              <Label showColon>Termin (baş.)</Label>
+              <DatePicker
+                style={{ width: '100%' }}
+                formatPattern="dd.MM.yyyy"
+                value={deadlineFrom}
+                valueState={deadlineFrom && !trToIsoDate(deadlineFrom) ? 'Negative' : 'None'}
+                onChange={(e) => setDeadlineFrom(e.target.value ?? '')}
+              />
+            </div>
+            <div style={{ width: '160px' }}>
+              <Label showColon>Termin (bit.)</Label>
+              <DatePicker
+                style={{ width: '100%' }}
+                formatPattern="dd.MM.yyyy"
+                value={deadlineTo}
+                valueState={deadlineTo && !trToIsoDate(deadlineTo) ? 'Negative' : 'None'}
+                onChange={(e) => setDeadlineTo(e.target.value ?? '')}
+              />
+            </div>
+            <Button
+              design="Transparent"
+              icon="clear-filter"
+              onClick={() => {
+                setPriorityFilter('');
+                setCustomerFilter('');
+                setFabricFilter('');
+                setDeadlineFrom('');
+                setDeadlineTo('');
+              }}
+            >
+              Temizle
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {selected.size > 0 && can('URETIM_EMIRLERI', 'edit') && (
+        <MessageStrip
+          design="Information"
+          hideCloseButton
+          style={{ marginBottom: '0.5rem' }}
+        >
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>{selected.size} emir seçildi.</span>
+            {can('URETIM_EMIRLERI', 'approve') && (
+              <>
+                <Button
+                  design="Emphasized"
+                  icon="accept"
+                  disabled={bulkStatus.isPending}
+                  onClick={() => setBulkTarget('PLANLANDI')}
+                >
+                  Toplu Onayla
+                </Button>
+                <Button
+                  design="Negative"
+                  icon="decline"
+                  disabled={bulkStatus.isPending}
+                  onClick={() => setBulkTarget('IPTAL')}
+                >
+                  Toplu İptal
+                </Button>
+              </>
+            )}
+            <Button design="Transparent" onClick={() => setSelected(new Set())}>
+              Seçimi Temizle
+            </Button>
+          </div>
+        </MessageStrip>
+      )}
+
+      {orders.isError && (
+        <MessageStrip design="Negative" hideCloseButton style={{ marginBottom: '0.5rem' }}>
+          Üretim emirleri yüklenemedi. {errorMessage(orders.error)}{' '}
+          <Button design="Transparent" onClick={() => orders.refetch()}>
+            Tekrar Dene
+          </Button>
+        </MessageStrip>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.25rem' }}>
+        <CheckBox
+          text="Sayfadakilerin tümünü seç"
+          checked={allOnPageSelected}
+          disabled={rows.length === 0}
+          onChange={(e) =>
+            setSelected((prev) => {
+              const next = new Set(prev);
+              // Secim yalnizca bu sayfayi etkiler; diger sayfalardaki secim korunur.
+              rows.forEach((o) => (e.target.checked ? next.add(o.id) : next.delete(o.id)));
+              return next;
+            })
+          }
+        />
+      </div>
+
+      <AnalyticalTable
+        columns={columns}
+        data={rows}
+        loading={orders.isLoading}
+        visibleRows={13}
+        filterable
+        noDataText={
+          orders.isError
+            ? 'Kayıtlar yüklenemedi.'
+            : 'Bu filtrelerle görüntülenecek üretim emri bulunamadı.'
+        }
+        onRowClick={(e) => {
+          const row = e.detail.row?.original as ProductionOrder | undefined;
+          if (row) setDetail(row);
+        }}
+      />
+
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        busy={orders.isFetching}
+        onChange={setPage}
+      />
+
+      {detail && (
+        <Dialog
+          open
+          stretch
+          headerText={`Üretim Emri - ${detail.orderNo}`}
+          onClose={() => setDetail(null)}
+          footer={
+            <Bar
+              design="Footer"
+              startContent={<StatusBadge status={detail.status} />}
+              endContent={
+                <>
+                  <Button
+                    icon="pdf-attachment"
+                    disabled={pdfBusy === detail.id}
+                    onClick={() => downloadPdf(detail)}
+                  >
+                    {pdfBusy === detail.id ? 'Hazırlanıyor...' : 'PDF İndir'}
+                  </Button>
+                  {can('URETIM_EMIRLERI', 'edit') &&
+                    ACTIONS.filter(
+                      (action) =>
+                        ALLOWED[detail.status].includes(action.status) &&
+                        // Onay/tamamlama/iptal ayri bir yetki: sunucu da bunu
+                        // uyguladigi icin butonu gostermek 403 ile sonuclanirdi.
+                        (!APPROVAL_STATUSES.includes(action.status) ||
+                          can('URETIM_EMIRLERI', 'approve')),
+                    ).map(
+                      (action) => (
+                        <Button
+                          key={action.status}
+                          icon={action.icon}
+                          design={action.design ?? 'Default'}
+                          disabled={changeStatus.isPending}
+                          onClick={() => {
+                            setProducedQty(String(detail.quantity));
+                            setConfirm({ order: detail, status: action.status });
+                          }}
+                        >
+                          {action.label}
+                        </Button>
+                      ),
+                    )}
+                  {/*
+                    PUT /orders/:id ve DELETE /orders/:id sunucuda vardi ama
+                    arayuzden hic cagrilmiyordu: emirler yazildiktan sonra
+                    duzenlenemiyordu.
+                  */}
+                  {can('URETIM_EMRI_OLUSTUR', 'edit') &&
+                    detail.status !== 'TAMAMLANDI' &&
+                    detail.status !== 'IPTAL' && (
+                      <Button
+                        design="Transparent"
+                        icon="edit"
+                        onClick={() => navigate(`/uretim-emri-duzenle/${detail.id}`)}
+                      >
+                        Düzenle
+                      </Button>
+                    )}
+                  {can('URETIM_EMRI_OLUSTUR', 'delete') &&
+                    (detail.status === 'TASLAK' || detail.status === 'IPTAL') && (
+                      <Button
+                        design="Negative"
+                        icon="delete"
+                        disabled={removeOrder.isPending}
+                        onClick={() => setDeleteTarget(detail)}
+                      >
+                        Sil
+                      </Button>
+                    )}
+                  <Button design="Transparent" onClick={() => setDetail(null)}>
+                    Kapat
+                  </Button>
+                </>
+              }
+            />
+          }
+        >
+          <OrderDetail
+            order={detail}
+            canEdit={can('URETIM_EMIRLERI', 'edit')}
+            onStep={(step, status) => {
+              // Bitirme miktar girisi ister; diger gecisler dogrudan uygulanir.
+              if (status === 'TAMAMLANDI') {
+                const kalan =
+                  detail.quantity -
+                  detail.stepLogs.reduce(
+                    (sum, s) => (s.nodeId === step.nodeId ? sum : sum + (s.scrapQty ?? 0)),
+                    0,
+                  );
+                setStepForm({
+                  orderId: detail.id,
+                  nodeId: step.nodeId,
+                  label: step.node.label,
+                  status,
+                  okQty: String(step.okQty ?? kalan),
+                  scrapQty: String(step.scrapQty ?? 0),
+                  notes: step.notes ?? '',
+                  maxQty: detail.quantity,
+                });
+                return;
+              }
+              updateStep.mutate({ orderId: detail.id, nodeId: step.nodeId, status });
+            }}
+          />
+        </Dialog>
+      )}
+
+      {bulkTarget && (
+        <MessageBox
+          open
+          type="Confirm"
+          titleText={bulkTarget === 'IPTAL' ? 'Toplu İptal' : 'Toplu Onay'}
+          actions={['Uygula', 'Vazgeç']}
+          onClose={(action) => {
+            if (action === 'Uygula') {
+              bulkStatus.mutate({ ids: [...selected], status: bulkTarget });
+            } else {
+              setBulkTarget(null);
+            }
+          }}
+        >
+          Seçili <strong>{selected.size}</strong> emir{' '}
+          <strong>{STATUS_LABEL[bulkTarget]}</strong> durumuna alınacak. Geçişe uygun olmayan
+          emirler atlanır ve sebebiyle birlikte bildirilir.
+        </MessageBox>
+      )}
+
+      {deleteTarget && (
+        <MessageBox
+          open
+          type="Warning"
+          titleText="Üretim Emrini Sil"
+          actions={['Sil', 'Vazgeç']}
+          onClose={(action) => {
+            if (action === 'Sil') removeOrder.mutate(deleteTarget.id);
+            else setDeleteTarget(null);
+          }}
+        >
+          <strong>{deleteTarget.orderNo}</strong> numaralı üretim emrini silmek istediğinize emin
+          misiniz? Bu işlem geri alınamaz.
+        </MessageBox>
+      )}
+
+      {stepForm && (
+        <StepFinishDialog
+          form={stepForm}
+          busy={updateStep.isPending}
+          onChange={(patch) => setStepForm((prev) => (prev ? { ...prev, ...patch } : prev))}
+          onCancel={() => setStepForm(null)}
+          onSubmit={() => {
+            updateStep.mutate(
+              {
+                orderId: stepForm.orderId,
+                nodeId: stepForm.nodeId,
+                status: stepForm.status,
+                okQty: stepForm.okQty === '' ? null : Number(stepForm.okQty),
+                scrapQty: stepForm.scrapQty === '' ? null : Number(stepForm.scrapQty),
+                notes: stepForm.notes.trim() || null,
+              },
+              { onSuccess: () => setStepForm(null) },
+            );
+          }}
+        />
+      )}
+
+      {confirm && (
+        <MessageBox
+          open
+          type="Confirm"
+          titleText="Durum Değişikliği"
+          actions={['Onayla', 'Vazgeç']}
+          onClose={(action) => {
+            if (action === 'Onayla') {
+              changeStatus.mutate({
+                id: confirm.order.id,
+                status: confirm.status,
+                ...(confirm.status === 'TAMAMLANDI' ? { qty: Number(producedQty) || 0 } : {}),
+              });
+            }
+            setConfirm(null);
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <span>
+              <strong>{confirm.order.orderNo}</strong> numaralı emrin durumu{' '}
+              <strong>{STATUS_LABEL[confirm.status]}</strong> olarak değiştirilecek. Onaylıyor
+              musunuz?
+            </span>
+            {confirm.status === 'TAMAMLANDI' && (
+              <div>
+                <Label showColon>Üretilen Adet</Label>
+                <Input
+                  type="Number"
+                  style={{ width: '100%' }}
+                  value={producedQty}
+                  onInput={(e) => setProducedQty(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </MessageBox>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EMIR DETAYI
+// ---------------------------------------------------------------------------
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: '0.75rem', color: 'var(--sapContent_LabelColor)' }}>{label}</div>
+      <div style={{ fontWeight: 600 }}>{value ?? '-'}</div>
+    </div>
+  );
+}
+
+function OrderDetail({
+  order,
+  canEdit,
+  onStep,
+}: {
+  order: ProductionOrder;
+  canEdit: boolean;
+  onStep: (step: OrderStepLog, status: StepStatus) => void;
+}) {
+  const remaining = daysUntil(order.deadline);
+  const overdue =
+    remaining < 0 && order.status !== 'TAMAMLANDI' && order.status !== 'IPTAL';
+
+  const steps = [...order.stepLogs].sort((a, b) => a.node.sortOrder - b.node.sortOrder);
+
+  return (
+    <div style={{ padding: '0.5rem 0.25rem', display: 'grid', gap: '1.25rem' }}>
+      {overdue && (
+        <MessageStrip design="Negative" hideCloseButton>
+          Bu emir termin tarihini {Math.abs(remaining)} gün aşmış durumda.
+        </MessageStrip>
+      )}
+
+      <section>
+        <Title level="H5">Emir Bilgileri</Title>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '0.875rem',
+            marginTop: '0.75rem',
+          }}
+        >
+          <Field label="Emir No" value={order.orderNo} />
+          <Field label="Durum" value={<StatusBadge status={order.status} />} />
+          <Field label="Aciliyet" value={<PriorityBadge priority={order.priority} />} />
+          <Field label="Müşteri" value={order.customer || '-'} />
+          <Field label="Kumaş Çeşidi" value={`${order.fabric.code} - ${order.fabric.name}`} />
+          <Field label="Flanş Çeşidi" value={`${order.flange.code} - ${order.flange.name}`} />
+          <Field label="Disk Çapı" value={`${formatNumber(order.diskDiameter, 1)} mm`} />
+          <Field label="Üretim Adedi" value={formatNumber(order.quantity)} />
+          <Field label="Katman Sayısı" value={order.layers} />
+          <Field label="Termin Tarihi" value={formatDate(order.deadline)} />
+          <Field
+            label="Kalan Süre"
+            value={
+              order.status === 'TAMAMLANDI' || order.status === 'IPTAL'
+                ? '-'
+                : remaining < 0
+                  ? `${Math.abs(remaining)} gün gecikme`
+                  : `${remaining} gün`
+            }
+          />
+          <Field label="Planlanan Başlangıç" value={formatDate(order.plannedStart)} />
+          <Field label="Üretim Başlangıcı" value={formatDateTime(order.startedAt)} />
+          <Field label="Tamamlanma" value={formatDateTime(order.completedAt)} />
+          <Field label="Üretilen Adet" value={formatNumber(order.producedQty)} />
+          <Field label="Emri Oluşturan" value={order.createdBy.fullName} />
+          <Field label="Onaylayan" value={order.approvedBy?.fullName ?? '-'} />
+          <Field label="Oluşturma" value={formatDateTime(order.createdAt)} />
+        </div>
+        {order.notes && (
+          <div style={{ marginTop: '0.875rem' }}>
+            <Field label="Üretim Notları" value={order.notes} />
+          </div>
+        )}
+      </section>
+
+      <section>
+        <Title level="H5">
+          Kimyasal Oranlaması
+          {order.recipe ? ` (Reçete: ${order.recipe.code} - ${order.recipe.name})` : ''}
+        </Title>
+        <table className="mp-perm-table" style={{ marginTop: '0.5rem' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '18%' }}>Kimyasal Kodu</th>
+              <th style={{ width: '42%' }}>Kimyasal Adı</th>
+              <th style={{ width: '15%' }}>Oran (%)</th>
+              <th style={{ width: '25%' }}>Not</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.chemicals.map((row) => (
+              <tr key={row.chemicalId}>
+                <td>{row.chemical?.code ?? '-'}</td>
+                <td style={{ textAlign: 'left' }}>{row.chemical?.name ?? '-'}</td>
+                <td>%{formatNumber(row.ratio, 2)}</td>
+                <td style={{ textAlign: 'left' }}>{row.notes ?? '-'}</td>
+              </tr>
+            ))}
+            {order.chemicals.length === 0 && (
+              <tr>
+                <td colSpan={4}>Kimyasal oranlaması girilmemiş.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <Title level="H5">
+          Üretim Proses Akışı
+          {order.workflow ? ` (${order.workflow.code} - ${order.workflow.name})` : ''}
+        </Title>
+        {steps.length === 0 ? (
+          <div style={{ marginTop: '0.5rem', color: 'var(--sapContent_LabelColor)' }}>
+            Bu emre bir proses şeması bağlanmamış.
+          </div>
+        ) : (
+          <table className="mp-perm-table" style={{ marginTop: '0.5rem' }}>
+            <thead>
+              <tr>
+                <th style={{ width: '4%' }}>#</th>
+                <th style={{ width: '24%' }}>Adım</th>
+                <th style={{ width: '14%' }}>Tip</th>
+                <th style={{ width: '16%' }}>Makine</th>
+                <th style={{ width: '10%' }}>Durum</th>
+                <th style={{ width: '8%' }}>Sağlam</th>
+                <th style={{ width: '8%' }}>Fire</th>
+                <th style={{ width: '12%' }}>Operatör</th>
+                <th style={{ width: '18%' }}>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {steps.map((step, index) => (
+                <tr key={step.id}>
+                  <td>{index + 1}</td>
+                  <td style={{ textAlign: 'left' }}>{step.node.label}</td>
+                  <td>{NODE_TYPE_LABEL[step.node.type]}</td>
+                  <td>{step.node.machine?.name ?? '-'}</td>
+                  <td>
+                    <ObjectStatus
+                      state={
+                        step.status === 'TAMAMLANDI'
+                          ? 'Positive'
+                          : step.status === 'BASLADI'
+                            ? 'Information'
+                            : step.status === 'ATLANDI'
+                              ? 'Critical'
+                              : 'None'
+                      }
+                    >
+                      {STEP_LABEL[step.status]}
+                    </ObjectStatus>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {step.okQty === null || step.okQty === undefined
+                      ? '-'
+                      : formatNumber(step.okQty)}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {step.scrapQty === null || step.scrapQty === undefined
+                      ? '-'
+                      : formatNumber(step.scrapQty)}
+                  </td>
+                  <td>{step.operator?.fullName ?? '-'}</td>
+                  <td>
+                    <div className="mp-inline-actions">
+                      {canEdit && step.status === 'BEKLIYOR' && (
+                        <>
+                          <Button
+                            design="Transparent"
+                            icon="play"
+                            onClick={() => onStep(step, 'BASLADI')}
+                          >
+                            Başlat
+                          </Button>
+                          <Button
+                            design="Transparent"
+                            icon="forward"
+                            tooltip="Bu adım uygulanmayacak"
+                            onClick={() => onStep(step, 'ATLANDI')}
+                          >
+                            Atla
+                          </Button>
+                        </>
+                      )}
+                      {canEdit && step.status === 'BASLADI' && (
+                        <>
+                          <Button
+                            design="Transparent"
+                            icon="accept"
+                            onClick={() => onStep(step, 'TAMAMLANDI')}
+                          >
+                            Bitir
+                          </Button>
+                          <Button
+                            design="Transparent"
+                            icon="forward"
+                            onClick={() => onStep(step, 'ATLANDI')}
+                          >
+                            Atla
+                          </Button>
+                        </>
+                      )}
+                      {canEdit && step.status === 'TAMAMLANDI' && (
+                        <Button
+                          design="Transparent"
+                          icon="edit"
+                          tooltip="Hatalı giriş için adımı yeniden aç"
+                          onClick={() => onStep(step, 'BASLADI')}
+                        >
+                          Düzelt
+                        </Button>
+                      )}
+                      {canEdit && step.status === 'ATLANDI' && (
+                        <Button
+                          design="Transparent"
+                          icon="undo"
+                          onClick={() => onStep(step, 'BEKLIYOR')}
+                        >
+                          Geri Al
+                        </Button>
+                      )}
+                      {!canEdit && step.status === 'TAMAMLANDI' && formatDateTime(step.completedAt)}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section>
+        <Title level="H5">Ürün Özeti</Title>
+        <div style={{ marginTop: '0.5rem', lineHeight: 1.7 }}>
+          <strong>{formatNumber(order.quantity)} adet</strong>{' '}
+          <strong>{formatNumber(order.diskDiameter, 0)} mm</strong> çapında,{' '}
+          <strong>{order.layers} katman</strong> disk cila fırçası;{' '}
+          <strong>{order.fabric.name}</strong> kumaşı{' '}
+          <strong>{order.flange.name}</strong> flanşı ile,{' '}
+          {order.chemicals.map((c) => `${c.chemical?.code} %${c.ratio}`).join(' + ')} oranındaki
+          kimyasal karışımı emdirilerek üretilecektir. Aciliyet:{' '}
+          <strong>{PRIORITY_LABEL[order.priority]}</strong>, termin:{' '}
+          <strong>{formatDate(order.deadline)}</strong>.
+        </div>
+      </section>
+    </div>
+  );
+}
+
+interface StepFormState {
+  orderId: string;
+  nodeId: string;
+  label: string;
+  status: StepStatus;
+  okQty: string;
+  scrapQty: string;
+  notes: string;
+  maxQty: number;
+}
+
+/**
+ * Adim bitirilirken saglam/fire miktari ve not alir.
+ *
+ * Bu alanlar veritabaninda ve sunucu semasinda bastan beri vardi ama arayuz
+ * yalnizca `{ status }` gonderdigi icin saha verisi hic toplanamiyordu.
+ */
+function StepFinishDialog({
+  form,
+  busy,
+  onChange,
+  onCancel,
+  onSubmit,
+}: {
+  form: StepFormState;
+  busy: boolean;
+  onChange: (patch: Partial<StepFormState>) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  const ok = form.okQty === '' ? 0 : Number(form.okQty);
+  const scrap = form.scrapQty === '' ? 0 : Number(form.scrapQty);
+  const toplam = ok + scrap;
+  const asim = toplam > form.maxQty;
+  const gecersiz = Number.isNaN(ok) || Number.isNaN(scrap) || ok < 0 || scrap < 0;
+
+  return (
+    <Dialog
+      open
+      headerText={`Adımı Bitir - ${form.label}`}
+      onClose={onCancel}
+      footer={
+        <Bar
+          design="Footer"
+          endContent={
+            <>
+              <Button design="Transparent" onClick={onCancel}>
+                Vazgeç
+              </Button>
+              <Button design="Emphasized" disabled={busy || asim || gecersiz} onClick={onSubmit}>
+                Kaydet
+              </Button>
+            </>
+          }
+        />
+      }
+    >
+      <div style={{ display: 'grid', gap: '0.75rem', minWidth: 'min(420px, 85vw)' }}>
+        {asim && (
+          <MessageStrip design="Negative" hideCloseButton>
+            Sağlam + fire toplamı ({formatNumber(toplam)}) emir adedini ({formatNumber(form.maxQty)})
+            aşamaz.
+          </MessageStrip>
+        )}
+        <div>
+          <Label showColon>Sağlam Adet</Label>
+          <Input
+            type="Number"
+            style={{ width: '100%' }}
+            value={form.okQty}
+            valueState={gecersiz || asim ? 'Negative' : 'None'}
+            onInput={(e) => onChange({ okQty: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label showColon>Fire Adet</Label>
+          <Input
+            type="Number"
+            style={{ width: '100%' }}
+            value={form.scrapQty}
+            valueState={gecersiz || asim ? 'Negative' : 'None'}
+            onInput={(e) => onChange({ scrapQty: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label showColon>Not</Label>
+          <Input
+            style={{ width: '100%' }}
+            placeholder="İsteğe bağlı"
+            value={form.notes}
+            onInput={(e) => onChange({ notes: e.target.value })}
+          />
+        </div>
+      </div>
+    </Dialog>
+  );
+}
