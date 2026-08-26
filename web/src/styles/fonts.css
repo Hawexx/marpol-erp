@@ -1,0 +1,93 @@
+/* ==========================================================================
+   SAP "72" - kurumsal yazi tipi
+   ==========================================================================
+
+   Bu dosya olmadan uygulama SAP 72'yi HIC yuklemiyordu: projede tek bir
+   .woff2 ve tek bir @font-face yoktu, dolayisiyla --sapFontFamily zinciri
+   ("72", "72full", Arial...) her zaman Arial'a dusuyordu. Sonuc olarak
+   font-weight 600 ile 700 de ayni goruniyordu (Arial'da 600 -> 700'e yuvarlanir).
+
+   Dosyalar @sap-theming/theming-base-content paketinden (UI5'in kendi
+   bagimliligi, Apache-2.0) web/public/fonts/ altina kopyalandi.
+
+   NEDEN "-full" SURUMLERI:
+   Paketteki alt kume (subset) dosyalarin unicode-range'i Turkce icin
+   YETERSIZ - g-breve (U+11E/11F), s-cedilla (U+15E/15F) ve buyuk noktali I
+   (U+130) kapsam disinda; yalnizca noktasiz i (U+131) ve Latin-1 var.
+   Subset kullanilsaydi bu bes harf Arial'a duser ve ayni kelime icinde
+   karisik font render'i olusurdu ("Is Akisi", "Degistir", "Sema"...).
+   "-full" dosyalarinda unicode-range yoktur -> tam kapsama.
+
+   AILE ADLARI:
+   UI5'in --sapFontFamily zinciri "72", "72full", Arial... seklinde, bu yuzden
+   ikisi de tanimlanir ve ayni dosyalara isaret eder. @font-face doküman
+   kapsamlidir; golge DOM'a da uygulanir, yani UI5 bilesenleri de gercek 72
+   ile cizilir.
+
+   font-display: swap -> metin once yedek fontla cizilir, font gelince
+   degisir; bos ekran (FOIT) olmaz.
+   ========================================================================== */
+
+/* --- 400 / Regular -------------------------------------------------------- */
+@font-face {
+  font-family: '72';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/72-Regular-full.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: '72full';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/72-Regular-full.woff2') format('woff2');
+}
+
+/* --- 600 / Semibold ------------------------------------------------------
+   Gercek 72 gomulduğu icin artik 600 ile 700 GORSEL OLARAK farkli. */
+@font-face {
+  font-family: '72';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/72-Semibold-full.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: '72full';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/72-Semibold-full.woff2') format('woff2');
+}
+
+/* --- 700 / Bold ----------------------------------------------------------- */
+@font-face {
+  font-family: '72';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/72-Bold-full.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: '72full';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/72-Bold-full.woff2') format('woff2');
+}
+
+/* --- Monospace -----------------------------------------------------------
+   Denetim kaydi ayrinti dokumunde kullanilir. Onceki kodda 'SAP 72 Mono'
+   yaziyordu; SAP'in gercek aile adi '72Mono' - yani o tanim da hicbir zaman
+   eslesmiyordu. */
+@font-face {
+  font-family: '72Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/72Mono-Regular-full.woff2') format('woff2');
+}
