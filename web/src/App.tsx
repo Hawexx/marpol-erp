@@ -18,6 +18,7 @@ import { NotificationProvider } from './components/NotificationProvider.js';
 import { StatusTicker } from './components/StatusTicker.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
 import { useAppTheme } from './theme/ThemeContext.js';
+import { MODULE_KEYS } from './lib/modules.js';
 import type { ModuleKey } from './api/types.js';
 import LoginPage from './pages/LoginPage.js';
 import ChangePasswordDialog from './pages/ChangePasswordDialog.js';
@@ -45,6 +46,13 @@ interface NavEntry {
   module: ModuleKey;
 }
 
+/*
+ * Menu girdileri modul kayitlariyla birebir degildir: IS_AKISI iki sekmeye
+ * (proses semalari + makineler), URETIM_EMIRLERI de iki sekmeye (emirler +
+ * planlama) acilir. Bu yuzden NAV ayri durur; asagidaki kontrol yalnizca
+ * hicbir modulun menusuz kalmadigini dogrular.
+ */
+
 /** Sol menu - sistemin 6 ana sekmesi + yetkilendirme paneli. */
 const NAV: NavEntry[] = [
   {
@@ -64,6 +72,18 @@ const NAV: NavEntry[] = [
   { route: '/stok', text: 'Stok Takibi', icon: 'inventory', module: 'STOK' },
   { route: '/denetim', text: 'Denetim Kaydı', icon: 'history', module: 'DENETIM' },
 ];
+
+/*
+ * Gelistirme sirasinda menusuz kalan modulu yakalar. Yeni bir modul
+ * eklenip menuye baglanmazsa kullanici yetkiyi alir ama sayfaya ulasamaz -
+ * sessiz ve fark edilmesi zor bir hata.
+ */
+if (import.meta.env.DEV) {
+  const menusuz = MODULE_KEYS.filter((k) => !NAV.some((n) => n.module === k));
+  if (menusuz.length) {
+    console.warn(`[MARPOL] Menude karsiligi olmayan modul: ${menusuz.join(', ')}`);
+  }
+}
 
 function PageLoading() {
   return (

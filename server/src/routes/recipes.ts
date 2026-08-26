@@ -4,6 +4,7 @@ import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { pageResponse, readPageParams } from '../lib/pagination.js';
 import { assertNoDuplicates, assertRatioTotal, text } from '../lib/schemaHelpers.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
@@ -47,9 +48,7 @@ recipesRouter.get(
   requirePermission(MODULE, 'view'),
   asyncHandler(async (req, res) => {
     const q = String(req.query.q ?? '').trim();
-    res.json(
-      await prisma.recipe.findMany({
-        where: {
+    const where = {
           ...(req.query.active === 'true' ? { isActive: true } : {}),
           ...(q
             ? {
@@ -60,11 +59,21 @@ recipesRouter.get(
                 ],
               }
             : {}),
-        },
+    };
+
+    const params = readPageParams(req);
+    const [rows, total] = await Promise.all([
+      prisma.recipe.findMany({
+        where,
         include,
         orderBy: { code: 'asc' },
+        skip: params.skip,
+        take: params.take,
       }),
-    );
+      prisma.recipe.count({ where }),
+    ]);
+
+    res.json(pageResponse(rows, total, params));
   }),
 );
 

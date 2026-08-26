@@ -7,6 +7,7 @@ import { prisma } from '../db.js';
 import { env } from '../env.js';
 import { asyncHandler, badRequest, conflict, forbidden } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { pageResponse, readPageParams } from '../lib/pagination.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
 export const usersRouter = Router();
@@ -203,22 +204,31 @@ usersRouter.get(
   requirePermission(MODULE, 'view'),
   asyncHandler(async (req, res) => {
     const q = String(req.query.q ?? '').trim();
-    const users = await prisma.user.findMany({
-      where: q
-        ? {
-            OR: [
-              { fullName: { contains: q, mode: 'insensitive' } },
-              { username: { contains: q, mode: 'insensitive' } },
-              { employeeNo: { contains: q, mode: 'insensitive' } },
-              { department: { contains: q, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
-      select: publicUser,
-      orderBy: { fullName: 'asc' },
-    });
+    const where = q
+      ? {
+          OR: [
+            { fullName: { contains: q, mode: 'insensitive' as const } },
+            { username: { contains: q, mode: 'insensitive' as const } },
+            { employeeNo: { contains: q, mode: 'insensitive' as const } },
+            { department: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
 
-    res.json(users.map((u) => ({ ...u, permissions: fullPermissionMatrix(u.permissions) })));
+    const params = readPageParams(req);
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: publicUser,
+        orderBy: { fullName: 'asc' },
+        skip: params.skip,
+        take: params.take,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const rows = users.map((u) => ({ ...u, permissions: fullPermissionMatrix(u.permissions) }));
+    res.json(pageResponse(rows, total, params));
   }),
 );
 

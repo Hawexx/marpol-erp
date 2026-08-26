@@ -4,6 +4,7 @@ import { ModuleKey } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { pageResponse, readPageParams } from '../lib/pagination.js';
 import { text } from '../lib/schemaHelpers.js';
 import { requireAnyPermission, requireAuth, requirePermission } from '../middleware/auth.js';
 
@@ -31,9 +32,7 @@ chemicalsRouter.get(
   canRead,
   asyncHandler(async (req, res) => {
     const q = String(req.query.q ?? '').trim();
-    res.json(
-      await prisma.chemical.findMany({
-        where: {
+    const where = {
           ...(req.query.active === 'true' ? { isActive: true } : {}),
           ...(q
             ? {
@@ -45,10 +44,20 @@ chemicalsRouter.get(
                 ],
               }
             : {}),
-        },
+    };
+
+    const params = readPageParams(req);
+    const [rows, total] = await Promise.all([
+      prisma.chemical.findMany({
+        where,
         orderBy: { code: 'asc' },
+        skip: params.skip,
+        take: params.take,
       }),
-    );
+      prisma.chemical.count({ where }),
+    ]);
+
+    res.json(pageResponse(rows, total, params));
   }),
 );
 

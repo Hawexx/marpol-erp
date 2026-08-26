@@ -4,6 +4,7 @@ import { ModuleKey, NodeType, StepStatus } from '@prisma/client';
 import { prisma } from '../db.js';
 import { asyncHandler, badRequest, conflict } from '../lib/http.js';
 import { audit } from '../lib/audit.js';
+import { pageResponse, readPageParams } from '../lib/pagination.js';
 import { text } from '../lib/schemaHelpers.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 
@@ -158,9 +159,7 @@ workflowsRouter.get(
   requirePermission(MODULE, 'view'),
   asyncHandler(async (req, res) => {
     const q = String(req.query.q ?? '').trim();
-    res.json(
-      await prisma.workflow.findMany({
-        where: {
+    const where = {
           ...(req.query.active === 'true' ? { isActive: true } : {}),
           ...(q
             ? {
@@ -170,11 +169,21 @@ workflowsRouter.get(
                 ],
               }
             : {}),
-        },
+    };
+
+    const params = readPageParams(req);
+    const [rows, total] = await Promise.all([
+      prisma.workflow.findMany({
+        where,
         include,
         orderBy: { code: 'asc' },
+        skip: params.skip,
+        take: params.take,
       }),
-    );
+      prisma.workflow.count({ where }),
+    ]);
+
+    res.json(pageResponse(rows, total, params));
   }),
 );
 

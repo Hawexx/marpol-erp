@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AnalyticalTable,
-  Bar,
   Button,
   CheckBox,
-  Dialog,
   Form,
   FormGroup,
   FormItem,
@@ -12,43 +10,44 @@ import {
   Label,
   MessageBox,
   ObjectStatus,
-} from '@ui5/webcomponents-react';
-import { api } from '../api/client.js';
-import { useEntity } from '../api/useEntity.js';
-import { useAuth } from '../auth/AuthContext.js';
-import { PageHeader, formatNumber } from '../components/ui.js';
-import { DataToolbar } from '../components/DataToolbar.js';
-import { Pagination } from '../components/Pagination.js';
-import { useDebounced } from '../lib/useDebounced.js';
-import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
-import { columns as tableColumns } from '../components/table.js';
-import type { Machine } from '../api/types.js';
+} from "@ui5/webcomponents-react";
+import { api } from "../api/client.js";
+import { useEntity } from "../api/useEntity.js";
+import { useAuth } from "../auth/AuthContext.js";
+import { PageHeader, formatNumber } from "../components/ui.js";
+import { DataToolbar } from "../components/DataToolbar.js";
+import { Pagination } from "../components/Pagination.js";
+import { useDebounced } from "../lib/useDebounced.js";
+import { downloadCsv, stampedFileName, type CsvColumn } from "../lib/csv.js";
+import { columns as tableColumns } from "../components/table.js";
+import { FormDialog } from "../components/FormDialog.js";
+import type { Machine } from "../api/types.js";
 
-type MachineForm = Omit<Machine, 'id'> & { id?: string };
+type MachineForm = Omit<Machine, "id"> & { id?: string };
 
 const EMPTY: MachineForm = {
-  code: '',
-  name: '',
-  line: '',
+  code: "",
+  name: "",
+  line: "",
   capacity: null,
-  location: '',
+  location: "",
   isActive: true,
 };
 
 const PAGE_SIZE = 50;
 
 const CSV_COLUMNS: CsvColumn<Machine>[] = [
-  { header: 'Kod', value: (r) => r.code },
-  { header: 'Ad', value: (r) => r.name },
-  { header: 'Hat', value: (r) => r.line },
-  { header: 'Kapasite (adet/saat)', value: (r) => r.capacity },
-  { header: 'Konum', value: (r) => r.location },
-  { header: 'Durum', value: (r) => (r.isActive ? 'Aktif' : 'Pasif') },
+  { header: "Kod", value: (r) => r.code },
+  { header: "Ad", value: (r) => r.name },
+  { header: "Hat", value: (r) => r.line },
+  { header: "Kapasite (adet/saat)", value: (r) => r.capacity },
+  { header: "Konum", value: (r) => r.location },
+  { header: "Durum", value: (r) => (r.isActive ? "Aktif" : "Pasif") },
 ];
 
 export default function MachinePage() {
   const { can } = useAuth();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [exportBusy, setExportBusy] = useState(false);
   const [form, setForm] = useState<MachineForm | null>(null);
@@ -56,7 +55,7 @@ export default function MachinePage() {
 
   const debouncedSearch = useDebounced(search, 300);
 
-  const { list, save, remove, total } = useEntity<Machine>('/machines', {
+  const { list, save, remove, total } = useEntity<Machine>("/machines", {
     search: debouncedSearch,
     page,
     pageSize: PAGE_SIZE,
@@ -68,10 +67,10 @@ export default function MachinePage() {
     setExportBusy(true);
     try {
       const all = await api.get<{ rows: Machine[] } | Machine[]>(
-        `/machines?pageSize=500&page=1${debouncedSearch ? `&q=${encodeURIComponent(debouncedSearch)}` : ''}`,
+        `/machines?pageSize=500&page=1${debouncedSearch ? `&q=${encodeURIComponent(debouncedSearch)}` : ""}`,
       );
       const rows = Array.isArray(all) ? all : all.rows;
-      downloadCsv(stampedFileName('makineler'), rows, CSV_COLUMNS);
+      downloadCsv(stampedFileName("makineler"), rows, CSV_COLUMNS);
     } finally {
       setExportBusy(false);
     }
@@ -80,37 +79,37 @@ export default function MachinePage() {
   const columns = useMemo(
     () =>
       tableColumns<Machine>([
-        { Header: 'Makine Kodu', accessor: 'code', width: 140 },
-        { Header: 'Makine Adı', accessor: 'name', minWidth: 200 },
-        { Header: 'Üretim Hattı', accessor: 'line', width: 150 },
+        { Header: "Makine Kodu", accessor: "code", width: 140 },
+        { Header: "Makine Adı", accessor: "name", minWidth: 200 },
+        { Header: "Üretim Hattı", accessor: "line", width: 150 },
         {
-          Header: 'Kapasite',
-          accessor: 'capacity',
+          Header: "Kapasite",
+          accessor: "capacity",
           width: 150,
-          hAlign: 'End' as const,
+          hAlign: "End" as const,
           Cell: ({ value }: { value?: number | null }) =>
-            value ? `${formatNumber(value)} adet/sa` : '-',
+            value ? `${formatNumber(value)} adet/sa` : "-",
         },
-        { Header: 'Konum', accessor: 'location', width: 160 },
+        { Header: "Konum", accessor: "location", width: 160 },
         {
-          Header: 'Durum',
-          accessor: 'isActive',
+          Header: "Durum",
+          accessor: "isActive",
           width: 100,
           Cell: ({ value }: { value: boolean }) => (
-            <ObjectStatus state={value ? 'Positive' : 'Negative'}>
-              {value ? 'Aktif' : 'Pasif'}
+            <ObjectStatus state={value ? "Positive" : "Negative"}>
+              {value ? "Aktif" : "Pasif"}
             </ObjectStatus>
           ),
         },
         {
-          Header: 'İşlem',
-          id: 'actions',
+          Header: "İşlem",
+          id: "actions",
           width: 110,
           disableFilters: true,
           disableSortBy: true,
           Cell: ({ row }: { row: { original: Machine } }) => (
             <div className="mp-inline-actions">
-              {can('IS_AKISI', 'edit') && (
+              {can("IS_AKISI", "edit") && (
                 <Button
                   design="Transparent"
                   icon="edit"
@@ -118,7 +117,7 @@ export default function MachinePage() {
                   onClick={() => setForm({ ...row.original })}
                 />
               )}
-              {can('IS_AKISI', 'delete') && (
+              {can("IS_AKISI", "delete") && (
                 <Button
                   design="Transparent"
                   icon="delete"
@@ -151,7 +150,7 @@ export default function MachinePage() {
         onRefresh={() => list.refetch()}
         onCreate={() => setForm({ ...EMPTY })}
         createLabel="Yeni Makine"
-        canCreate={can('IS_AKISI', 'create')}
+        canCreate={can("IS_AKISI", "create")}
         count={total}
         onExport={exportCsv}
         exportBusy={exportBusy}
@@ -163,7 +162,9 @@ export default function MachinePage() {
         loading={list.isLoading}
         visibleRows={14}
         filterable
-        noDataText={list.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı makine bulunamadı.'}
+        noDataText={
+          list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı makine bulunamadı."
+        }
       />
 
       <Pagination
@@ -175,80 +176,70 @@ export default function MachinePage() {
       />
 
       {form && (
-        <Dialog
-          open
-          headerText={form.id ? `Makine Düzenle - ${form.code}` : 'Yeni Makine Tanımı'}
-          onClose={() => setForm(null)}
-          footer={
-            <Bar
-              design="Footer"
-              endContent={
-                <>
-                  <Button design="Transparent" onClick={() => setForm(null)}>
-                    Vazgeç
-                  </Button>
-                  <Button
-                    design="Emphasized"
-                    disabled={!valid || save.isPending}
-                    onClick={() => {
-                      const { id, ...data } = form;
-                      save.mutate({ id, data }, { onSuccess: () => setForm(null) });
-                    }}
-                  >
-                    Kaydet
-                  </Button>
-                </>
-              }
-            />
+        <FormDialog
+          headerText={
+            form.id ? `Makine Düzenle - ${form.code}` : "Yeni Makine Tanımı"
           }
+          onClose={() => setForm(null)}
+          onSave={() => {
+            const { id, ...data } = form;
+            save.mutate({ id, data }, { onSuccess: () => setForm(null) });
+          }}
+          saveDisabled={!valid}
+          busy={save.isPending}
+          width="min(560px, 85vw)"
         >
-          <div style={{ minWidth: 'min(560px, 85vw)', padding: '0.5rem 0' }}>
-            <Form layout="S1 M2 L2 XL2">
-              <FormGroup headerText="Makine Bilgileri">
-                <FormItem labelContent={<Label required>Makine Kodu</Label>}>
-                  <Input
-                    value={form.code}
-                    placeholder="MK-01"
-                    onInput={(e) => update({ code: e.target.value })}
-                  />
-                </FormItem>
-                <FormItem labelContent={<Label required>Makine Adı</Label>}>
-                  <Input value={form.name} onInput={(e) => update({ name: e.target.value })} />
-                </FormItem>
-                <FormItem labelContent={<Label>Üretim Hattı</Label>}>
-                  <Input
-                    value={form.line ?? ''}
-                    placeholder="Hat 1"
-                    onInput={(e) => update({ line: e.target.value })}
-                  />
-                </FormItem>
-                <FormItem labelContent={<Label>Kapasite (adet/saat)</Label>}>
-                  <Input
-                    type="Number"
-                    value={form.capacity === null ? '' : String(form.capacity)}
-                    placeholder="Planlama hesabında kullanılır"
-                    onInput={(e) =>
-                      update({ capacity: e.target.value === '' ? null : Number(e.target.value) })
-                    }
-                  />
-                </FormItem>
-                <FormItem labelContent={<Label>Konum</Label>}>
-                  <Input
-                    value={form.location ?? ''}
-                    onInput={(e) => update({ location: e.target.value })}
-                  />
-                </FormItem>
-                <FormItem labelContent={<Label>Durum</Label>}>
-                  <CheckBox
-                    text="Aktif"
-                    checked={form.isActive}
-                    onChange={(e) => update({ isActive: e.target.checked })}
-                  />
-                </FormItem>
-              </FormGroup>
-            </Form>
-          </div>
-        </Dialog>
+          <Form layout="S1 M2 L2 XL2">
+            <FormGroup headerText="Makine Bilgileri">
+              <FormItem labelContent={<Label required>Makine Kodu</Label>}>
+                <Input
+                  value={form.code}
+                  placeholder="MK-01"
+                  onInput={(e) => update({ code: e.target.value })}
+                />
+              </FormItem>
+              <FormItem labelContent={<Label required>Makine Adı</Label>}>
+                <Input
+                  value={form.name}
+                  onInput={(e) => update({ name: e.target.value })}
+                />
+              </FormItem>
+              <FormItem labelContent={<Label>Üretim Hattı</Label>}>
+                <Input
+                  value={form.line ?? ""}
+                  placeholder="Hat 1"
+                  onInput={(e) => update({ line: e.target.value })}
+                />
+              </FormItem>
+              <FormItem labelContent={<Label>Kapasite (adet/saat)</Label>}>
+                <Input
+                  type="Number"
+                  value={form.capacity === null ? "" : String(form.capacity)}
+                  placeholder="Planlama hesabında kullanılır"
+                  onInput={(e) =>
+                    update({
+                      capacity:
+                        e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </FormItem>
+              <FormItem labelContent={<Label>Konum</Label>}>
+                <Input
+                  value={form.location ?? ""}
+                  onInput={(e) => update({ location: e.target.value })}
+                />
+              </FormItem>
+              <FormItem labelContent={<Label>Durum</Label>}>
+                <CheckBox
+                  text="Aktif"
+                  checked={form.isActive}
+                  onChange={(e) => update({ isActive: e.target.checked })}
+                />
+              </FormItem>
+            </FormGroup>
+          </Form>
+        </FormDialog>
       )}
 
       {deleteTarget && (
@@ -256,17 +247,20 @@ export default function MachinePage() {
           open
           type="Warning"
           titleText="Makineyi Sil"
-          actions={['Sil', 'Vazgeç']}
+          actions={["Sil", "Vazgeç"]}
           onClose={(action) => {
-            if (action === 'Sil') {
-              remove.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+            if (action === "Sil") {
+              remove.mutate(deleteTarget.id, {
+                onSuccess: () => setDeleteTarget(null),
+              });
             } else {
               setDeleteTarget(null);
             }
           }}
         >
-          <strong>{deleteTarget.code}</strong> - {deleteTarget.name} makinesini silmek
-          istediğinize emin misiniz? Proses şemalarında kullanılıyorsa silinemez.
+          <strong>{deleteTarget.code}</strong> - {deleteTarget.name} makinesini
+          silmek istediğinize emin misiniz? Proses şemalarında kullanılıyorsa
+          silinemez.
         </MessageBox>
       )}
     </div>

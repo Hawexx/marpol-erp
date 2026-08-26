@@ -40,17 +40,8 @@ export const NODE_TYPE_LABEL: Record<string, string> = {
   END: 'Bitiş',
 };
 
-export const MODULE_LABEL: Record<string, string> = {
-  URETIM_EMRI_OLUSTUR: 'Üretim Emri Oluşturma',
-  FLANS: 'Flanş Çeşitleri',
-  KUMAS: 'Kumaş Çeşitleri',
-  KIMYASAL_RECETE: 'Kimyasal Reçete',
-  IS_AKISI: 'İş Akışı / Proses Şemaları',
-  URETIM_EMIRLERI: 'Üretim Emirleri',
-  YETKILENDIRME: 'Yetkilendirme Paneli',
-  DENETIM: 'Denetim Kaydı',
-  STOK: 'Stok Takibi',
-};
+// Modul etiketleri tek kaynaktan gelir (bkz. lib/modules.ts).
+export { MODULE_LABEL } from './modules.js';
 
 /** Stok hareket sebepleri. */
 export const STOCK_REASON_LABEL: Record<string, string> = {
