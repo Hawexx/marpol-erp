@@ -9,4 +9,5 @@
  * Bilesen yalnizca BeforeSearch ve NoData'yi kendisi getirir; digerleri
  * burada alinmazsa ekranda gorsel hic gorunmez (sessiz hata).
  */
+import '@ui5/webcomponents-fiori/dist/illustrations/NoData.js';
 import '@ui5/webcomponents-fiori/dist/illustrations/UnableToLoad.js';

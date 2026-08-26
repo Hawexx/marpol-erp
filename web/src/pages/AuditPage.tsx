@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Bar,
   Button,
+  DatePicker,
   Dialog,
   Input,
   Label,
@@ -10,6 +11,7 @@ import {
 } from '@ui5/webcomponents-react';
 import { api } from '../api/client.js';
 import { Pagination } from '../components/Pagination.js';
+import { tableEmptyText } from '../components/states.js';
 import { UiSelect } from '../components/UiSelect.js';
 import { DataTable } from '../components/DataTable.js';
 import { actionColumn, columns as tableColumns } from '../components/table.js';
@@ -205,25 +207,25 @@ export default function AuditPage() {
             />
           </div>
 
-          <div style={{ width: '150px' }}>
+          <div style={{ width: '160px' }}>
             <Label showColon>Başlangıç</Label>
-            <Input
+            <DatePicker
               style={{ width: '100%' }}
-              placeholder="gg.aa.yyyy"
+              formatPattern="dd.MM.yyyy"
               value={from}
               valueState={from && !fromIso ? 'Negative' : 'None'}
-              onInput={(e) => applyFilter(() => setFrom(e.target.value))}
+              onChange={(e) => applyFilter(() => setFrom(e.target.value ?? ''))}
             />
           </div>
 
-          <div style={{ width: '150px' }}>
+          <div style={{ width: '160px' }}>
             <Label showColon>Bitiş</Label>
-            <Input
+            <DatePicker
               style={{ width: '100%' }}
-              placeholder="gg.aa.yyyy"
+              formatPattern="dd.MM.yyyy"
               value={to}
               valueState={to && !toIso ? 'Negative' : 'None'}
-              onInput={(e) => applyFilter(() => setTo(e.target.value))}
+              onChange={(e) => applyFilter(() => setTo(e.target.value ?? ''))}
             />
           </div>
 
@@ -254,9 +256,12 @@ export default function AuditPage() {
           columns={columns}
           data={logs.data?.rows ?? []}
           loading={logs.isLoading}
-          noDataText={
-            logs.isError ? 'Kayıtlar yüklenemedi.' : 'Bu filtrelerle denetim kaydı bulunamadı.'
-          }
+          noDataText={tableEmptyText({
+            isError: logs.isError,
+            filtered: Boolean(search || action || entity || userId || from || to),
+            empty: 'Henüz denetim kaydı oluşmamış.',
+            noResults: 'Bu filtrelerle denetim kaydı bulunamadı.',
+          })}
         />
 
         <Pagination

@@ -22,6 +22,7 @@ import {
   Section,
 } from '../components/ui.js';
 import { newId } from '../lib/id.js';
+import { EmptyState } from '../components/states.js';
 import { UiSelect } from '../components/UiSelect.js';
 import type { Machine, NodeType, Workflow, WorkflowEdge, WorkflowNode } from '../api/types.js';
 
@@ -456,8 +457,11 @@ export default function WorkflowPage() {
       )}
 
       {!draft ? (
-        <Section>
-          <Text>Görüntülemek için bir proses şeması seçin veya yeni bir şema oluşturun.</Text>
+        <Section flush>
+          <EmptyState
+            title="Görüntülenecek şema seçilmedi"
+            description="Yukarıdan bir proses şeması seçin veya yeni bir şema oluşturun."
+          />
         </Section>
       ) : (
         <div className="mp-canvas-layout">

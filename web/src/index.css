@@ -178,6 +178,63 @@ ui5-multi-input {
   gap: var(--mp-gap-stack);
 }
 
+/* Form penceresi govdesi: baslik cubugu ve altbilgi arasinda nefes. */
+.mp-dialog-body {
+  padding: var(--mp-space-2) 0;
+}
+
+/* Bos / hata / yukleniyor ekranlari: yuzeyin ortasinda nefes alan bir blok. */
+.mp-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 16rem;
+  padding: var(--mp-space-8) var(--mp-pad-card);
+  text-align: center;
+}
+
+/* ==========================================================================
+   Liste araclari cubugu
+   ==========================================================================
+
+   Sol taraf arama ve filtreler, sag taraf eylemler. Iki taraf da kendi
+   icinde sarar; dar ekranda cubuk iki satira iner ama taraflar karismaz. */
+.mp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mp-gap-inline);
+  flex-wrap: wrap;
+  min-height: var(--mp-toolbar-h);
+  padding: var(--mp-space-2) var(--mp-space-3);
+  background: var(--sapToolbar_Background);
+  border: var(--mp-border-subtle);
+  border-radius: var(--mp-radius-md);
+}
+
+.mp-toolbar__side {
+  display: flex;
+  align-items: center;
+  gap: var(--mp-gap-inline);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.mp-toolbar__side--end {
+  justify-content: flex-end;
+}
+
+.mp-toolbar__search {
+  width: 260px;
+  max-width: 100%;
+}
+
+.mp-toolbar__count {
+  color: var(--sapContent_LabelColor);
+  font-size: var(--mp-font-size-sm);
+  white-space: nowrap;
+}
+
 /* Filtre alanlari: yan yana dizilir, dar ekranda kendiliginden sarar. */
 .mp-filters {
   display: flex;

@@ -19,6 +19,7 @@ import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
 import { DataToolbar } from "../components/DataToolbar.js";
 import { DataTable } from '../components/DataTable.js';
+import { tableEmptyText } from '../components/states.js';
 import { actionColumn, columns as tableColumns } from "../components/table.js";
 import { FormDialog } from "../components/FormDialog.js";
 import { MODULES, MODULE_KEYS } from "../lib/modules.js";
@@ -257,7 +258,11 @@ export default function UsersPage() {
           data={list.data ?? []}
           loading={list.isLoading}
           filterable
-          noDataText={list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı personel bulunamadı."}
+          noDataText={tableEmptyText({
+            isError: list.isError,
+            filtered: Boolean(debouncedSearch),
+            empty: 'Kayıtlı personel bulunamadı.',
+          })}
         />
 
         <Pagination
@@ -297,7 +302,7 @@ export default function UsersPage() {
             (isNew && form.password.length < 8)
           }
           busy={save.isPending}
-          width="min(900px, 90vw)"
+          size="lg"
         >
           <Form layout="S1 M2 L2 XL2">
             <FormGroup headerText="Personel Bilgileri">

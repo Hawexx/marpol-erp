@@ -23,6 +23,7 @@ import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
 import { downloadCsv, stampedFileName, type CsvColumn } from "../lib/csv.js";
 import { DataTable } from '../components/DataTable.js';
+import { tableEmptyText } from '../components/states.js';
 import { actionColumn, columns as tableColumns } from "../components/table.js";
 import { FormDialog } from "../components/FormDialog.js";
 import type { Chemical, Recipe, RecipeItem } from "../api/types.js";
@@ -218,9 +219,11 @@ export default function RecipePage() {
           data={list.data ?? []}
           loading={list.isLoading}
           filterable
-          noDataText={
-            list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı reçete bulunamadı."
-          }
+          noDataText={tableEmptyText({
+            isError: list.isError,
+            filtered: Boolean(debouncedSearch),
+            empty: 'Kayıtlı reçete bulunamadı.',
+          })}
         />
 
         <Pagination
@@ -258,7 +261,7 @@ export default function RecipePage() {
             !form.code || !form.name || !ratioOk || form.items.length === 0
           }
           busy={save.isPending}
-          width="min(780px, 85vw)"
+          size="lg"
           footerStart={
             <span
               style={{

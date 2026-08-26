@@ -34,16 +34,25 @@ function sourceFiles(dir) {
 }
 
 /**
- * Ikon adlarini toplar. Uc kullanim bicimi var:
- *   icon="add"            JSX niteligi
- *   icon: 'add-document'  yapilandirma dizisi (NAV, ACTIONS)
- *   icon={x ? 'a' : 'b'}  kosullu
+ * Ikon adlarini toplar. Dort kullanim bicimi var:
+ *   icon="add"                  JSX niteligi
+ *   icon: 'add-document'        yapilandirma dizisi (NAV, ACTIONS)
+ *   icon={x ? 'a' : 'b'}        kosullu
+ *   <InputIcon name="show">     Input'un icindeki ikon yuvasi
  */
 function extractIcons(text) {
   const names = new Set();
 
   for (const m of text.matchAll(/\bicon\s*=\s*"([a-z0-9-]+)"/g)) names.add(m[1]);
   for (const m of text.matchAll(/\bicon\s*:\s*'([a-z0-9-]+)'/g)) names.add(m[1]);
+
+  /*
+   * InputIcon ikonu `icon` degil `name` prop'uyla alir; yukaridaki desenlerin
+   * hicbiri onu goremez. Import edilmezse ikon sessizce bos cikar.
+   */
+  for (const m of text.matchAll(/<InputIcon[^>]*?\bname\s*=\s*"([a-z0-9-]+)"/gs)) {
+    names.add(m[1]);
+  }
 
   /*
    * icon={...} blogu. Kosullu ifadelerde yalnizca SONUC dallari alinir:

@@ -24,6 +24,7 @@ import { ListSection, PageHeader, formatNumber } from '../components/ui.js';
 import { DataToolbar } from '../components/DataToolbar.js';
 import { Pagination } from '../components/Pagination.js';
 import { DataTable } from '../components/DataTable.js';
+import { tableEmptyText } from '../components/states.js';
 import { actionColumn, columns as tableColumns } from '../components/table.js';
 import { useDebounced } from '../lib/useDebounced.js';
 import type { Chemical, Fabric, FabricChemical } from '../api/types.js';
@@ -224,7 +225,11 @@ function FabricsTab({ canEdit }: { canEdit: CanFn }) {
           data={list.data ?? []}
           loading={list.isLoading}
           filterable
-          noDataText={list.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kumaş bulunamadı.'}
+          noDataText={tableEmptyText({
+            isError: list.isError,
+            filtered: Boolean(debouncedSearch),
+            empty: 'Kayıtlı kumaş bulunamadı.',
+          })}
         />
 
         <Pagination
@@ -557,7 +562,11 @@ function ChemicalsTab({ canEdit }: { canEdit: CanFn }) {
           data={list.data ?? []}
           loading={list.isLoading}
           filterable
-          noDataText={list.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kimyasal bulunamadı.'}
+          noDataText={tableEmptyText({
+            isError: list.isError,
+            filtered: Boolean(debouncedSearch),
+            empty: 'Kayıtlı kimyasal bulunamadı.',
+          })}
         />
 
         <Pagination

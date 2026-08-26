@@ -17,6 +17,7 @@ import { DataToolbar } from '../components/DataToolbar.js';
 import { Pagination } from '../components/Pagination.js';
 import { UiSelect } from '../components/UiSelect.js';
 import { DataTable } from '../components/DataTable.js';
+import { tableEmptyText } from '../components/states.js';
 import { actionColumn, columns as tableColumns } from '../components/table.js';
 import { useDebounced } from '../lib/useDebounced.js';
 import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
@@ -254,7 +255,7 @@ export default function StockPage() {
         count={stock.data?.total}
         onExport={exportCsv}
         exportBusy={exportBusy}
-        extra={
+        filters={
           <CheckBox
             text="Yalnızca kritik seviyedekiler"
             checked={onlyLow}
@@ -269,7 +270,11 @@ export default function StockPage() {
           data={stock.data?.rows ?? []}
           loading={stock.isLoading}
           filterable
-          noDataText={stock.isError ? 'Kayıtlar yüklenemedi.' : 'Kayıtlı kimyasal bulunamadı.'}
+          noDataText={tableEmptyText({
+            isError: stock.isError,
+            filtered: Boolean(debouncedSearch) || onlyLow,
+            empty: 'Kayıtlı kimyasal bulunamadı.',
+          })}
         />
 
         <Pagination
@@ -429,7 +434,6 @@ export default function StockPage() {
       {historyOf && (
         <Dialog
           open
-          stretch
           headerText={`Hareket Geçmişi - ${historyOf.code} ${historyOf.name}`}
           onClose={() => setHistoryOf(null)}
           footer={
@@ -452,7 +456,7 @@ export default function StockPage() {
             />
           }
         >
-          <div className="mp-grid-scroll">
+          <div className="mp-dialog-body mp-grid-scroll" style={{ minWidth: 'min(60rem, 90vw)' }}>
             <table className="mp-grid mp-grid--zebra mp-grid--wrap">
               <caption className="mp-visually-hidden">Stok hareket geçmişi</caption>
               <thead>

@@ -19,6 +19,7 @@ import { useAuth } from '../auth/AuthContext.js';
 import { DataToolbar } from '../components/DataToolbar.js';
 import { UiSelect } from '../components/UiSelect.js';
 import { Pagination } from '../components/Pagination.js';
+import { tableEmptyText } from '../components/states.js';
 import { useEntity } from '../api/useEntity.js';
 import { useDebounced } from '../lib/useDebounced.js';
 import { downloadCsv, stampedFileName, type CsvColumn } from '../lib/csv.js';
@@ -485,7 +486,7 @@ export default function OrderListPage() {
         count={total}
         onExport={exportCsv}
         exportBusy={exportBusy}
-        extra={
+        filters={
           <>
             <Label showColon>Durum</Label>
             <UiSelect
@@ -651,11 +652,20 @@ export default function OrderListPage() {
             const ids = e.detail.selectedRowIds ?? {};
             setSelected(new Set(Object.keys(ids).filter((id) => ids[id])));
           }}
-          noDataText={
-            orders.isError
-              ? 'Kayıtlar yüklenemedi.'
-              : 'Bu filtrelerle görüntülenecek üretim emri bulunamadı.'
-          }
+          noDataText={tableEmptyText({
+            isError: orders.isError,
+            filtered: Boolean(
+              debouncedSearch ||
+                priorityFilter ||
+                customerFilter ||
+                fabricFilter ||
+                deadlineFrom ||
+                deadlineTo ||
+                statusFilter !== 'OPEN',
+            ),
+            empty: 'Henüz üretim emri oluşturulmamış.',
+            noResults: 'Bu filtrelerle görüntülenecek üretim emri bulunamadı.',
+          })}
           onRowClick={(e) => {
             const row = e.detail.row?.original as ProductionOrder | undefined;
             if (row) setDetail(row);

@@ -20,6 +20,7 @@ import { Pagination } from "../components/Pagination.js";
 import { useDebounced } from "../lib/useDebounced.js";
 import { downloadCsv, stampedFileName, type CsvColumn } from "../lib/csv.js";
 import { DataTable } from '../components/DataTable.js';
+import { tableEmptyText } from '../components/states.js';
 import { actionColumn, columns as tableColumns } from "../components/table.js";
 import { FormDialog } from "../components/FormDialog.js";
 import type { Flange } from "../api/types.js";
@@ -215,9 +216,11 @@ export default function FlangePage() {
           data={list.data ?? []}
           loading={list.isLoading}
           filterable
-          noDataText={
-            list.isError ? "Kayıtlar yüklenemedi." : "Kayıtlı flanş bulunamadı."
-          }
+          noDataText={tableEmptyText({
+            isError: list.isError,
+            filtered: Boolean(debouncedSearch),
+            empty: 'Kayıtlı flanş bulunamadı.',
+          })}
         />
 
         <Pagination

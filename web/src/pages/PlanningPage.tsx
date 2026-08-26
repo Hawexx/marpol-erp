@@ -11,6 +11,7 @@ import {
 import { api, errorMessage } from '../api/client.js';
 import { DataTable } from '../components/DataTable.js';
 import { columns as tableColumns } from '../components/table.js';
+import { ErrorState, LoadingState } from '../components/states.js';
 import {
   KpiTile,
   ListSection,
@@ -120,7 +121,14 @@ export default function PlanningPage() {
         <Tab text="Termin Takvimi" data-key="takvim" selected={tab === 'takvim'} />
       </TabContainer>
 
-      {tab === 'ozet' && <Dashboard data={d} loading={dashboard.isLoading} />}
+      {tab === 'ozet' && (
+        <Dashboard
+          data={d}
+          loading={dashboard.isLoading}
+          isError={dashboard.isError}
+          onRetry={() => dashboard.refetch()}
+        />
+      )}
       {tab === 'makine' && (
         <MachineLoad
           rows={machines.data?.rows ?? []}
@@ -139,9 +147,37 @@ export default function PlanningPage() {
   );
 }
 
-function Dashboard({ data, loading }: { data?: DashboardData; loading: boolean }) {
-  if (loading && !data) return <Section>Yükleniyor...</Section>;
-  if (!data) return null;
+function Dashboard({
+  data,
+  loading,
+  isError,
+  onRetry,
+}: {
+  data?: DashboardData;
+  loading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  if (loading && !data) {
+    return (
+      <Section flush>
+        <LoadingState text="Pano hazırlanıyor..." />
+      </Section>
+    );
+  }
+  // Istek basarisiz olduğunda eskiden hicbir sey cizilmiyordu: kullanici
+  // bos bir sayfayla kaliyordu.
+  if (!data) {
+    return (
+      <Section flush>
+        <ErrorState
+          title="Pano verileri yüklenemedi"
+          description="Bağlantınızı kontrol edip yeniden deneyin."
+          onRetry={isError ? onRetry : undefined}
+        />
+      </Section>
+    );
+  }
 
   const enYuksekGunluk = Math.max(1, ...data.daily.map((g) => g.produced + g.scrap));
 
